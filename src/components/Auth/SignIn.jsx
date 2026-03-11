@@ -1,24 +1,7 @@
-import { useEffect } from 'react'
-import { useStore } from '../../store/useStore.js'
-import { initGoogleAuth, requestToken, getUserInfo } from '../../services/googleAuth.js'
-import { loadFromDrive } from '../../services/googleDrive.js'
+import { requestToken } from '../../services/googleAuth.js'
 import { version } from '../../../package.json'
 
 export default function SignIn() {
-  const { setUser, hydrate, theme } = useStore()
-
-  useEffect(() => {
-    if (!window.google) return
-    initGoogleAuth({
-      onSignIn: async (token) => {
-        const info = await getUserInfo(token)
-        const user = { name: info.name, email: info.email, picture: info.picture }
-        const driveData = await loadFromDrive()
-        if (driveData) hydrate(driveData)
-        setUser(user)
-      },
-    })
-  }, [])
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-zinc-50 dark:bg-zinc-900">

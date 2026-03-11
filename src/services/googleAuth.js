@@ -12,13 +12,14 @@ export function getAccessToken() {
   return accessToken
 }
 
-export function initGoogleAuth({ onSignIn, onTokenExpired }) {
+export function initGoogleAuth({ onSignIn, onError }) {
   tokenClient = window.google.accounts.oauth2.initTokenClient({
     client_id: CLIENT_ID,
     scope: SCOPES,
     callback: (response) => {
       if (response.error) {
         console.error('Auth error:', response.error)
+        onError && onError(response.error)
         return
       }
       accessToken = response.access_token
@@ -30,6 +31,11 @@ export function initGoogleAuth({ onSignIn, onTokenExpired }) {
 export function requestToken() {
   if (!tokenClient) return
   tokenClient.requestAccessToken({ prompt: '' })
+}
+
+export function silentRequestToken() {
+  if (!tokenClient) return
+  tokenClient.requestAccessToken({ prompt: 'none' })
 }
 
 export function signOut() {

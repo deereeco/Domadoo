@@ -2,6 +2,8 @@ import { useEffect } from 'react'
 import { useStore } from './store/useStore.js'
 import { useSyncDrive } from './hooks/useSyncDrive.js'
 import { useDebugConsole } from './hooks/useDebugConsole.js'
+import { initGoogleAuth, silentRequestToken, getUserInfo } from './services/googleAuth.js'
+import { loadFromDrive } from './services/googleDrive.js'
 import SignIn from './components/Auth/SignIn.jsx'
 import Header from './components/Layout/Header.jsx'
 import FilterBar from './components/Labels/FilterBar.jsx'
@@ -11,12 +13,34 @@ import DoneTodayView from './components/DoneTodayView.jsx'
 import LabelManager from './components/Labels/LabelManager.jsx'
 
 export default function App() {
-  const { user, detailsModalNodeId, showDoneToday, showLabelManager, theme } = useStore()
+  const { user, setUser, signOut: storeSignOut, hydrate, detailsModalNodeId, showDoneToday, showLabelManager, theme } = useStore()
   const handleDebugTap = useDebugConsole()
 
   // Apply saved theme on mount
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark')
+  }, [])
+
+  // Initialize Google auth client and attempt silent re-auth if user is persisted
+  useEffect(() => {
+    if (!window.google) return
+
+    initGoogleAuth({
+      onSignIn: async (token) => {
+        const info = await getUserInfo(token)
+        const userInfo = { name: info.name, email: info.email, picture: info.picture }
+        const driveData = await loadFromDrive()
+        if (driveData) hydrate(driveData)
+        setUser(userInfo)
+      },
+      onError: () => {
+        storeSignOut()
+      },
+    })
+
+    if (user) {
+      silentRequestToken()
+    }
   }, [])
 
   // Auto-save to localStorage + Drive

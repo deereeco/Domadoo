@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { createNode, createLabel } from '../types/index.js'
-import { saveToCache, loadFromCache } from '../services/localCache.js'
+import { saveToCache, loadFromCache, saveUser, loadUser, clearUser } from '../services/localCache.js'
 
 const DEFAULT_STATE = {
   nodes: {},
@@ -33,10 +33,12 @@ export const useStore = create((set, get) => ({
 
   // ── Auth ───────────────────────────────────────────────────────────────────
   setUser(user) {
+    saveUser(user)
     set({ user })
   },
 
   signOut() {
+    clearUser()
     set({ user: null })
   },
 
@@ -370,6 +372,10 @@ export const useStore = create((set, get) => ({
 const saved = loadFromCache()
 if (saved) {
   useStore.getState().hydrate(saved)
+}
+const persistedUser = loadUser()
+if (persistedUser) {
+  useStore.setState({ user: persistedUser })
 }
 const currentTheme = useStore.getState().theme
 document.documentElement.classList.toggle('dark', currentTheme === 'dark')

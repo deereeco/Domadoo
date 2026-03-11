@@ -1,4 +1,5 @@
 const KEY = 'domadoo_state'
+const USER_KEY = 'domadoo_user'
 
 export function saveToCache(state) {
   try {
@@ -20,4 +21,19 @@ export function loadFromCache() {
 
 export function clearCache() {
   localStorage.removeItem(KEY)
+}
+
+export function saveUser(user) {
+  try { localStorage.setItem(USER_KEY, JSON.stringify(user)) } catch (e) {}
+}
+
+export function loadUser() {
+  try {
+    const raw = localStorage.getItem(USER_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch (e) { return null }
+}
+
+export function clearUser() {
+  localStorage.removeItem(USER_KEY)
 }
