@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useStore } from '../../store/useStore.js'
 import { initGoogleAuth, requestToken, getUserInfo } from '../../services/googleAuth.js'
 import { loadFromDrive } from '../../services/googleDrive.js'
+import { version } from '../../../package.json'
 
 export default function SignIn() {
   const { setUser, hydrate, theme } = useStore()
@@ -29,6 +30,7 @@ export default function SignIn() {
           <p className="text-zinc-500 dark:text-zinc-400 text-sm">
             Your personal focus board
           </p>
+          <p className="text-xs text-zinc-400 dark:text-zinc-500">v{version}</p>
         </div>
 
         <div className="bg-white dark:bg-zinc-800 rounded-2xl shadow-sm border border-zinc-200 dark:border-zinc-700 p-8 space-y-4">

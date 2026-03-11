@@ -1,6 +1,7 @@
 import ThemeToggle from './ThemeToggle.jsx'
 import { useStore } from '../../store/useStore.js'
 import { signOut } from '../../services/googleAuth.js'
+import { version } from '../../../package.json'
 
 export default function Header() {
   const { user, setShowDoneToday, showDoneToday, setShowLabelManager, syncStatus, addTodaysTasksCard, todaysTasksRootId, signOut: storeSignOut } = useStore()
@@ -15,9 +16,10 @@ export default function Header() {
       <div className="max-w-screen-xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
         {/* Left: App name */}
         <div className="flex items-center gap-3">
-          <h1 className="text-lg font-bold text-zinc-900 dark:text-white tracking-tight">
-            Domadoo
-          </h1>
+          <div className="flex flex-col leading-tight">
+            <h1 className="text-lg font-bold text-zinc-900 dark:text-white tracking-tight">Domadoo</h1>
+            <span className="text-[10px] text-zinc-400 dark:text-zinc-500">v{version}</span>
+          </div>
           {syncStatus === 'saving' && (
             <span className="text-xs text-zinc-400 dark:text-zinc-500">Saving…</span>
           )}
