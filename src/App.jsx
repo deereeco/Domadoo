@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useStore } from './store/useStore.js'
 import { useSyncDrive } from './hooks/useSyncDrive.js'
+import { useDebugConsole } from './hooks/useDebugConsole.js'
 import SignIn from './components/Auth/SignIn.jsx'
 import Header from './components/Layout/Header.jsx'
 import FilterBar from './components/Labels/FilterBar.jsx'
@@ -11,6 +12,7 @@ import LabelManager from './components/Labels/LabelManager.jsx'
 
 export default function App() {
   const { user, detailsModalNodeId, showDoneToday, showLabelManager, theme } = useStore()
+  const handleDebugTap = useDebugConsole()
 
   // Apply saved theme on mount
   useEffect(() => {
@@ -34,6 +36,13 @@ export default function App() {
       {detailsModalNodeId && <DetailsModal />}
       {showDoneToday && <DoneTodayView />}
       {showLabelManager && <LabelManager />}
+
+      {/* Hidden debug tap zone — quadruple-tap bottom-right to open Eruda */}
+      <div
+        onPointerDown={handleDebugTap}
+        className="fixed bottom-0 right-0 w-16 h-16 z-50"
+        aria-hidden="true"
+      />
     </div>
   )
 }
