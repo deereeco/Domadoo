@@ -33,13 +33,17 @@ export default function App() {
         if (driveData) hydrate(driveData)
         setUser(userInfo)
       },
-      onError: () => {
+      onError: (err) => {
+        console.warn('[auth] silent re-auth failed:', err, '→ signing out')
         storeSignOut()
       },
     })
 
     if (user) {
+      console.log('[auth] persisted user detected, attempting silent re-auth')
       silentRequestToken()
+    } else {
+      console.log('[auth] no user in store, showing sign-in page')
     }
   }, [])
 

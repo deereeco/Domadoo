@@ -13,15 +13,17 @@ export function getAccessToken() {
 }
 
 export function initGoogleAuth({ onSignIn, onError }) {
+  console.log('[auth] initGoogleAuth called')
   tokenClient = window.google.accounts.oauth2.initTokenClient({
     client_id: CLIENT_ID,
     scope: SCOPES,
     callback: (response) => {
       if (response.error) {
-        console.error('Auth error:', response.error)
+        console.warn('[auth] token error:', response.error)
         onError && onError(response.error)
         return
       }
+      console.log('[auth] token received, expires in', response.expires_in, 's')
       accessToken = response.access_token
       onSignIn && onSignIn(response.access_token)
     },
@@ -30,11 +32,13 @@ export function initGoogleAuth({ onSignIn, onError }) {
 
 export function requestToken() {
   if (!tokenClient) return
+  console.log('[auth] requestToken (manual sign-in)')
   tokenClient.requestAccessToken({ prompt: '' })
 }
 
 export function silentRequestToken() {
   if (!tokenClient) return
+  console.log('[auth] silentRequestToken (prompt: none)')
   tokenClient.requestAccessToken({ prompt: 'none' })
 }
 

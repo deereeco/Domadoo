@@ -375,7 +375,10 @@ if (saved) {
 }
 const persistedUser = loadUser()
 if (persistedUser) {
+  console.log('[auth] restoring persisted user:', persistedUser.email)
   useStore.setState({ user: persistedUser })
+} else {
+  console.log('[auth] no persisted user found')
 }
 const currentTheme = useStore.getState().theme
 document.documentElement.classList.toggle('dark', currentTheme === 'dark')
