@@ -25,6 +25,9 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const nodeRef = useRef(null)
 
+  const nestTargetId = useStore(s => s.nestTargetId)
+  const isNestTarget = nestTargetId === nodeId
+
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: nodeId,
     data: { type: 'node', nodeId, parentId, depth },
@@ -65,7 +68,7 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
       <div
         {...attributes}
         {...listeners}
-        className={`flex items-start gap-1.5 py-0.5 rounded-lg px-1 -mx-1 hover:bg-zinc-100/60 dark:hover:bg-zinc-800/60 transition-colors touch-none ${dragMode ? 'cursor-grab select-none' : ''} ${vis.dimmed ? 'opacity-40' : ''}`}
+        className={`flex items-start gap-1.5 py-0.5 rounded-lg px-1 -mx-1 hover:bg-zinc-100/60 dark:hover:bg-zinc-800/60 transition-colors touch-none ${dragMode ? 'cursor-grab select-none' : ''} ${vis.dimmed ? 'opacity-40' : ''} ${isNestTarget ? 'ring-2 ring-indigo-400' : ''}`}
       >
         {/* Drag handle — always visible in drag mode, hover-only otherwise */}
         <span

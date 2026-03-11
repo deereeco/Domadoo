@@ -16,6 +16,7 @@ const DEFAULT_STATE = {
   showLabelManager: false,
   syncStatus: 'idle', // 'idle' | 'saving' | 'error'
   dragMode: false,
+  nestTargetId: null,
 }
 
 export const useStore = create((set, get) => ({
@@ -30,6 +31,10 @@ export const useStore = create((set, get) => ({
   toggleDragMode() {
     set(s => ({ dragMode: !s.dragMode }))
   },
+
+  // ── Nest Target ────────────────────────────────────────────────────────────
+  setNestTarget(id) { set({ nestTargetId: id }) },
+  clearNestTarget() { set({ nestTargetId: null }) },
 
   // ── Theme ──────────────────────────────────────────────────────────────────
   toggleTheme() {

@@ -1,9 +1,9 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useState, useRef } from 'react'
 import {
   DndContext,
   DragOverlay,
   PointerSensor,
-  closestCorners,
+  pointerWithin,
   useSensor,
   useSensors,
   useDroppable,
@@ -14,9 +14,10 @@ import { useStore } from '../../store/useStore.js'
 import RootCard from '../Card/RootCard.jsx'
 
 export default function Board() {
-  const { rootOrder, nodes, addRootNode, moveNode, reorderRootCards, reorderChildren, dragMode, linkToTodaysTasks, todaysTasksRootId } = useStore()
+  const { rootOrder, nodes, addRootNode, moveNode, reorderRootCards, reorderChildren, dragMode, linkToTodaysTasks, todaysTasksRootId, setNestTarget, clearNestTarget } = useStore()
 
   const [activeDragType, setActiveDragType] = useState(null)
+  const nestTimerRef = useRef(null)
   const { setNodeRef: setBoardRef, isOver: isBoardOver } = useDroppable({
     id: 'board-background',
     data: { type: 'board' },
@@ -30,7 +31,18 @@ export default function Board() {
     setActiveDragType(active.data.current?.type ?? null)
   }, [])
 
+  const handleDragOver = useCallback(({ over }) => {
+    if (nestTimerRef.current) { clearTimeout(nestTimerRef.current); nestTimerRef.current = null }
+    clearNestTarget()
+    if (over?.data?.current?.type === 'node') {
+      nestTimerRef.current = setTimeout(() => setNestTarget(over.id), 400)
+    }
+  }, [clearNestTarget, setNestTarget])
+
   const handleDragEnd = useCallback(({ active, over }) => {
+    if (nestTimerRef.current) { clearTimeout(nestTimerRef.current); nestTimerRef.current = null }
+    const nestTargetId = useStore.getState().nestTargetId
+    clearNestTarget()
     setActiveDragType(null)
     if (!over || active.id === over.id) return
 
@@ -91,6 +103,12 @@ export default function Board() {
         const overNode = nodes[overData.nodeId]
         if (!overNode) return
 
+        // Hover-to-nest: drop as last child of target node
+        if (nestTargetId === over.id && overData.nodeId !== nodeId) {
+          moveNode({ nodeId, newParentId: overData.nodeId, newIndex: overNode.childrenIds.length })
+          return
+        }
+
         // Same parent: reorder
         if (currentNode.parentId === overNode.parentId) {
           const parent = currentNode.parentId ? nodes[currentNode.parentId] : null
@@ -118,7 +136,7 @@ export default function Board() {
   }, [rootOrder, nodes, moveNode, reorderRootCards, reorderChildren, linkToTodaysTasks, todaysTasksRootId])
 
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+    <DndContext sensors={sensors} collisionDetection={pointerWithin} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
       <div className="max-w-screen-xl mx-auto px-4 py-6">
         <SortableContext items={rootOrder} strategy={rectSortingStrategy}>
           <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4">
