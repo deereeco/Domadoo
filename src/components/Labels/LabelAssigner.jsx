@@ -10,7 +10,7 @@ export default function LabelAssigner({ nodeId, onClose }) {
   useEffect(() => { inputRef.current?.focus() }, [])
 
   const filtered = Object.values(labels).filter(l =>
-    l.name.toLowerCase().includes(search.toLowerCase())
+    !l.isSystem && l.name.toLowerCase().includes(search.toLowerCase())
   )
 
   return (

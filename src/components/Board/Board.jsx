@@ -14,7 +14,7 @@ import { useStore } from '../../store/useStore.js'
 import RootCard from '../Card/RootCard.jsx'
 
 export default function Board() {
-  const { rootOrder, nodes, addRootNode, moveNode, reorderRootCards, reorderChildren, dragMode } = useStore()
+  const { rootOrder, nodes, addRootNode, moveNode, reorderRootCards, reorderChildren, dragMode, linkToTodaysTasks, todaysTasksRootId } = useStore()
 
   const [activeDragType, setActiveDragType] = useState(null)
   const { setNodeRef: setBoardRef, isOver: isBoardOver } = useDroppable({
@@ -70,12 +70,18 @@ export default function Board() {
         return
       }
 
-      // Drop onto a card body → reparent into that card
+      // Drop onto a card body → reparent into that card (or link to today's tasks)
       if (overData?.type === 'card-body') {
         const targetParent = overData.cardId
         const targetNode = nodes[targetParent]
         if (targetNode) {
-          moveNode({ nodeId, newParentId: targetParent, newIndex: targetNode.childrenIds.length })
+          const isDropOnTodaysCard = targetParent === todaysTasksRootId
+          const sourceIsLinkedCopy = nodes[nodeId]?.isTodaysTask
+          if (isDropOnTodaysCard && !sourceIsLinkedCopy) {
+            linkToTodaysTasks(nodeId)
+          } else {
+            moveNode({ nodeId, newParentId: targetParent, newIndex: targetNode.childrenIds.length })
+          }
         }
         return
       }
@@ -109,7 +115,7 @@ export default function Board() {
         return
       }
     }
-  }, [rootOrder, nodes, moveNode, reorderRootCards, reorderChildren])
+  }, [rootOrder, nodes, moveNode, reorderRootCards, reorderChildren, linkToTodaysTasks, todaysTasksRootId])
 
   return (
     <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>

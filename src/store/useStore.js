@@ -8,6 +8,7 @@ const DEFAULT_STATE = {
   rootOrder: [],
   activeFilters: {},
   todaysTasksRootId: null,
+  todaysTasksLabelId: null,
   theme: 'dark',
   user: null,
   detailsModalNodeId: null,
@@ -61,10 +62,13 @@ export const useStore = create((set, get) => ({
   addTodaysTasksCard() {
     const node = createNode({ parentId: null, content: "Today's Tasks" })
     node.isTodaysTask = true
+    const todayLabel = createLabel({ name: 'Today', color: '#FCD34D', isSystem: true })
     set(state => ({
       nodes: { ...state.nodes, [node.id]: node },
+      labels: { ...state.labels, [todayLabel.id]: todayLabel },
       rootOrder: [node.id, ...state.rootOrder],
       todaysTasksRootId: node.id,
+      todaysTasksLabelId: todayLabel.id,
     }))
     return node.id
   },
@@ -104,7 +108,12 @@ export const useStore = create((set, get) => ({
     set(state => {
       const node = state.nodes[id]
       if (!node) return {}
-      return { nodes: { ...state.nodes, [id]: { ...node, content } } }
+      const updates = { [id]: { ...node, content } }
+      node.linkedNodeIds.forEach(lid => {
+        const linked = state.nodes[lid]
+        if (linked) updates[lid] = { ...linked, content }
+      })
+      return { nodes: { ...state.nodes, ...updates } }
     })
   },
 
@@ -113,7 +122,12 @@ export const useStore = create((set, get) => ({
       const node = state.nodes[id]
       if (!node) return {}
       const type = node.type === 'CHECKBOX' ? 'BULLET' : 'CHECKBOX'
-      return { nodes: { ...state.nodes, [id]: { ...node, type } } }
+      const updates = { [id]: { ...node, type } }
+      node.linkedNodeIds.forEach(lid => {
+        const linked = state.nodes[lid]
+        if (linked) updates[lid] = { ...linked, type }
+      })
+      return { nodes: { ...state.nodes, ...updates } }
     })
   },
 
@@ -163,7 +177,7 @@ export const useStore = create((set, get) => ({
     })
   },
 
-  deleteNode(id) {
+  deleteNode(id, { deleteLinked = false } = {}) {
     set(state => {
       const node = state.nodes[id]
       if (!node) return {}
@@ -176,11 +190,31 @@ export const useStore = create((set, get) => ({
       }
       collectDescendants(id)
 
+      // Optionally also delete linked nodes (e.g. today's copies)
+      if (deleteLinked) {
+        node.linkedNodeIds.forEach(lid => collectDescendants(lid))
+      }
+
       const newNodes = { ...state.nodes }
       toDelete.forEach(nid => delete newNodes[nid])
 
+      // Clean up linkedNodeIds and today label on surviving nodes that referenced deleted nodes
+      Object.keys(newNodes).forEach(nid => {
+        const n = newNodes[nid]
+        if (!n.linkedNodeIds || n.linkedNodeIds.length === 0) return
+        const filtered = n.linkedNodeIds.filter(lid => !toDelete.has(lid))
+        if (filtered.length !== n.linkedNodeIds.length) {
+          let labelIds = n.labelIds
+          // If this is the original and its today's copy was deleted, remove today label
+          if (state.todaysTasksLabelId && !filtered.some(lid => state.nodes[lid]?.isTodaysTask)) {
+            labelIds = labelIds.filter(lid => lid !== state.todaysTasksLabelId)
+          }
+          newNodes[nid] = { ...n, linkedNodeIds: filtered, labelIds }
+        }
+      })
+
       // Remove from parent
-      if (node.parentId) {
+      if (node.parentId && !toDelete.has(node.parentId)) {
         const parent = newNodes[node.parentId]
         if (parent) {
           newNodes[node.parentId] = {
@@ -188,6 +222,21 @@ export const useStore = create((set, get) => ({
             childrenIds: parent.childrenIds.filter(c => c !== id),
           }
         }
+      }
+
+      // Remove any linked-deleted nodes from their parents too
+      if (deleteLinked) {
+        node.linkedNodeIds.forEach(lid => {
+          const linked = state.nodes[lid]
+          if (!linked || toDelete.has(linked.parentId)) return
+          const parent = newNodes[linked.parentId]
+          if (parent) {
+            newNodes[linked.parentId] = {
+              ...parent,
+              childrenIds: parent.childrenIds.filter(c => c !== lid),
+            }
+          }
+        })
       }
 
       const newRootOrder = state.rootOrder.filter(rid => !toDelete.has(rid))
@@ -266,6 +315,9 @@ export const useStore = create((set, get) => ({
       const node = state.nodes[nodeId]
       if (!todaysCard || !node) return {}
 
+      // Guard: already linked to today's tasks
+      if (node.linkedNodeIds.some(lid => state.nodes[lid]?.isTodaysTask)) return {}
+
       // Create a linked copy
       const linkedNode = {
         ...node,
@@ -275,10 +327,18 @@ export const useStore = create((set, get) => ({
         isTodaysTask: true,
         linkedNodeIds: [nodeId],
       }
-      // Update original node's linkedNodeIds
+
+      // Apply today label to original
+      const todayLabelId = state.todaysTasksLabelId
+      const updatedLabelIds = todayLabelId
+        ? [...new Set([...node.labelIds, todayLabelId])]
+        : node.labelIds
+
+      // Update original node's linkedNodeIds and today label
       const updatedOriginal = {
         ...node,
         linkedNodeIds: [...new Set([...node.linkedNodeIds, linkedNode.id])],
+        labelIds: updatedLabelIds,
       }
       const updatedTodaysCard = {
         ...todaysCard,
@@ -293,6 +353,41 @@ export const useStore = create((set, get) => ({
           [todaysId]: updatedTodaysCard,
         },
       }
+    })
+  },
+
+  // Remove a linked today's copy and clean up the original
+  unlinkFromTodaysTasks(linkedNodeId) {
+    set(state => {
+      const linkedNode = state.nodes[linkedNodeId]
+      if (!linkedNode || !linkedNode.isTodaysTask) return {}
+
+      const newNodes = { ...state.nodes }
+
+      // Remove from Today's Tasks card's childrenIds
+      const todaysId = linkedNode.parentId
+      if (todaysId && newNodes[todaysId]) {
+        newNodes[todaysId] = {
+          ...newNodes[todaysId],
+          childrenIds: newNodes[todaysId].childrenIds.filter(c => c !== linkedNodeId),
+        }
+      }
+
+      // Clean up original node's linkedNodeIds and today label
+      linkedNode.linkedNodeIds.forEach(originalId => {
+        const original = newNodes[originalId]
+        if (!original) return
+        const filteredLinks = original.linkedNodeIds.filter(lid => lid !== linkedNodeId)
+        const filteredLabels = state.todaysTasksLabelId
+          ? original.labelIds.filter(lid => lid !== state.todaysTasksLabelId)
+          : original.labelIds
+        newNodes[originalId] = { ...original, linkedNodeIds: filteredLinks, labelIds: filteredLabels }
+      })
+
+      // Delete the linked copy
+      delete newNodes[linkedNodeId]
+
+      return { nodes: newNodes }
     })
   },
 

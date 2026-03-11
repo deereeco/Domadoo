@@ -12,7 +12,9 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
   const node = useStore(s => s.nodes[nodeId])
   const labels = useStore(s => s.labels)
   const { updateNodeContent, toggleComplete, toggleExpand, toggleNodeType,
-          toggleLabelOnNode, deleteNode, openDetailsModal, addChildNode, dragMode } = useStore()
+          toggleLabelOnNode, deleteNode, openDetailsModal, addChildNode, dragMode,
+          linkToTodaysTasks, unlinkFromTodaysTasks, todaysTasksRootId } = useStore()
+  const nodes = useStore(s => s.nodes)
 
   const visibility = useNodeVisibility()
   const vis = visibility[nodeId] ?? { visible: true, dimmed: false, hasHiddenChildren: false }
@@ -20,6 +22,7 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
 
   const [showLabelAssigner, setShowLabelAssigner] = useState(false)
   const [showNodeMenu, setShowNodeMenu] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const nodeRef = useRef(null)
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -39,6 +42,12 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
   const isCompleted = node.status === 'COMPLETED'
   const hasChildren = node.childrenIds.length > 0
   const nodeLabels = node.labelIds.map(id => labels[id]).filter(Boolean)
+
+  // Today's Tasks linking
+  const hasTodaysCopy = node.linkedNodeIds.some(lid => nodes[lid]?.isTodaysTask)
+  const isTodaysCopy = node.isTodaysTask && node.linkedNodeIds.length > 0 && node.id !== todaysTasksRootId
+  const canAddToToday = todaysTasksRootId && !node.isTodaysTask && !hasTodaysCopy
+  const hasLinkedRelationship = hasTodaysCopy || isTodaysCopy
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -206,9 +215,29 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
             </svg>
           </button>
 
+          {/* Add to Today's Tasks */}
+          {canAddToToday && (
+            <button
+              onClick={() => linkToTodaysTasks(nodeId)}
+              className="p-1 rounded text-zinc-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/30"
+              title="Add to Today's Tasks"
+            >
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <circle cx="12" cy="12" r="4" strokeWidth={2} />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+              </svg>
+            </button>
+          )}
+
           {/* Delete */}
           <button
-            onClick={() => deleteNode(nodeId)}
+            onClick={() => {
+              if (hasLinkedRelationship) {
+                setShowDeleteConfirm(true)
+              } else {
+                deleteNode(nodeId)
+              }
+            }}
             className="p-1 rounded text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30"
             title="Delete"
           >
@@ -218,6 +247,54 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
           </button>
         </div>
         </div>{/* end interactive content wrapper */}
+
+      {/* Delete confirmation for linked nodes */}
+      {showDeleteConfirm && (
+        <div className="mt-1 ml-6 p-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-xs">
+          {isTodaysCopy ? (
+            <>
+              <p className="text-red-700 dark:text-red-300 mb-1.5 font-medium">Remove from Today&apos;s Tasks?</p>
+              <div className="flex gap-1.5 flex-wrap">
+                <button
+                  onClick={() => { unlinkFromTodaysTasks(nodeId); setShowDeleteConfirm(false) }}
+                  className="px-2 py-1 rounded bg-red-500 text-white hover:bg-red-600"
+                >Remove only</button>
+                <button
+                  onClick={() => {
+                    const originalId = node.linkedNodeIds[0]
+                    if (originalId) deleteNode(originalId, { deleteLinked: true })
+                    else unlinkFromTodaysTasks(nodeId)
+                    setShowDeleteConfirm(false)
+                  }}
+                  className="px-2 py-1 rounded bg-red-700 text-white hover:bg-red-800"
+                >Remove &amp; delete original</button>
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="px-2 py-1 rounded bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-300 dark:hover:bg-zinc-600"
+                >Cancel</button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="text-red-700 dark:text-red-300 mb-1.5 font-medium">This task is linked in Today&apos;s Tasks.</p>
+              <div className="flex gap-1.5 flex-wrap">
+                <button
+                  onClick={() => { deleteNode(nodeId, { deleteLinked: true }); setShowDeleteConfirm(false) }}
+                  className="px-2 py-1 rounded bg-red-700 text-white hover:bg-red-800"
+                >Delete both</button>
+                <button
+                  onClick={() => { deleteNode(nodeId); setShowDeleteConfirm(false) }}
+                  className="px-2 py-1 rounded bg-red-500 text-white hover:bg-red-600"
+                >Just this task</button>
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="px-2 py-1 rounded bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-300 dark:hover:bg-zinc-600"
+                >Cancel</button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
       </div>
 
       {/* Children */}

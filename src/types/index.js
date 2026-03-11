@@ -17,10 +17,11 @@ export function createNode({ parentId = null, type = 'CHECKBOX', content = '' } 
   }
 }
 
-export function createLabel({ name = 'New Label', color = '#6366f1' } = {}) {
+export function createLabel({ name = 'New Label', color = '#6366f1', isSystem = false } = {}) {
   return {
     id: uuidv4(),
     name,
     color,
+    isSystem,
   }
 }

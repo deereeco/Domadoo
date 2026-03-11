@@ -70,9 +70,9 @@ export default function LabelManager() {
             </button>
           </div>
 
-          {/* Existing labels */}
+          {/* Existing labels (system labels are hidden) */}
           <div className="space-y-1">
-            {Object.values(labels).map(label => (
+            {Object.values(labels).filter(l => !l.isSystem).map(label => (
               <LabelRow
                 key={label.id}
                 label={label}
@@ -86,7 +86,7 @@ export default function LabelManager() {
                 onCancel={() => setEditingId(null)}
               />
             ))}
-            {Object.keys(labels).length === 0 && (
+            {Object.values(labels).filter(l => !l.isSystem).length === 0 && (
               <p className="text-sm text-zinc-400 text-center py-4">No labels yet. Create one above.</p>
             )}
           </div>
