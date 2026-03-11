@@ -50,10 +50,13 @@ A highly interactive, modern task-tracking board. Visually inspired by Google Ke
 git clone https://github.com/deereeco/Domadoo.git
 cd Domadoo
 npm install
+npm run setup
 cp .env.example .env
 # Add your client ID to .env
 npm run dev
 ```
+
+`npm run setup` installs the git pre-commit hook that automatically increments the patch version in `package.json` on every commit. Run it once after cloning on each machine.
 
 `.env`:
 ```
