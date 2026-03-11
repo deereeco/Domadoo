@@ -1,0 +1,83 @@
+import ThemeToggle from './ThemeToggle.jsx'
+import { useStore } from '../../store/useStore.js'
+import { signOut } from '../../services/googleAuth.js'
+
+export default function Header() {
+  const { user, setShowDoneToday, showDoneToday, setShowLabelManager, syncStatus, addTodaysTasksCard, todaysTasksRootId, signOut: storeSignOut } = useStore()
+
+  const handleSignOut = () => {
+    signOut()
+    storeSignOut()
+  }
+
+  return (
+    <header className="sticky top-0 z-40 bg-zinc-50/80 dark:bg-zinc-900/80 backdrop-blur border-b border-zinc-200 dark:border-zinc-800">
+      <div className="max-w-screen-xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
+        {/* Left: App name */}
+        <div className="flex items-center gap-3">
+          <h1 className="text-lg font-bold text-zinc-900 dark:text-white tracking-tight">
+            Domadoo
+          </h1>
+          {syncStatus === 'saving' && (
+            <span className="text-xs text-zinc-400 dark:text-zinc-500">Saving…</span>
+          )}
+          {syncStatus === 'error' && (
+            <span className="text-xs text-red-400">Sync error</span>
+          )}
+        </div>
+
+        {/* Right: actions */}
+        <div className="flex items-center gap-1">
+          {!todaysTasksRootId && (
+            <button
+              onClick={addTodaysTasksCard}
+              className="px-3 py-1.5 text-xs rounded-lg font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              title="Add Today's Tasks card"
+            >
+              Today's Tasks
+            </button>
+          )}
+
+          <button
+            onClick={() => setShowDoneToday(!showDoneToday)}
+            className={`px-3 py-1.5 text-xs rounded-lg font-medium transition-colors ${
+              showDoneToday
+                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400'
+                : 'text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+            }`}
+          >
+            Done Today
+          </button>
+
+          <button
+            onClick={() => setShowLabelManager(true)}
+            className="px-3 py-1.5 text-xs rounded-lg font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+          >
+            Labels
+          </button>
+
+          <ThemeToggle />
+
+          {user && (
+            <div className="relative group ml-1">
+              <img
+                src={user.picture}
+                alt={user.name}
+                className="w-8 h-8 rounded-full cursor-pointer"
+              />
+              <div className="absolute right-0 top-full mt-1 hidden group-hover:block bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-lg py-1 min-w-[160px] z-50">
+                <p className="px-3 py-1 text-xs text-zinc-500 dark:text-zinc-400">{user.email}</p>
+                <button
+                  onClick={handleSignOut}
+                  className="w-full text-left px-3 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-700"
+                >
+                  Sign out
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </header>
+  )
+}
