@@ -3,10 +3,10 @@ import {
   DndContext,
   DragOverlay,
   closestCorners,
-  PointerSensor,
   useSensor,
   useSensors,
 } from '@dnd-kit/core'
+import { DoubleTapSensor } from '../../sensors/DoubleTapSensor.js'
 import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable'
 import { useStore } from '../../store/useStore.js'
 import RootCard from '../Card/RootCard.jsx'
@@ -15,7 +15,7 @@ export default function Board() {
   const { rootOrder, nodes, addRootNode, moveNode, reorderRootCards, reorderChildren } = useStore()
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+    useSensor(DoubleTapSensor, { activationConstraint: { delay: 250, tolerance: 8 } })
   )
 
   const handleDragEnd = useCallback(({ active, over }) => {

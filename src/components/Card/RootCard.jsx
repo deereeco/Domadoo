@@ -49,8 +49,12 @@ export default function RootCard({ nodeId }) {
           : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900'
       } ${isOver ? 'ring-2 ring-indigo-400' : ''} shadow-sm hover:shadow-md`}
     >
-      {/* Card Header */}
-      <div className="flex items-center gap-2 px-4 pt-3 pb-2 border-b border-zinc-100 dark:border-zinc-800">
+      {/* Card Header — double-tap anywhere then hold to drag */}
+      <div
+        {...attributes}
+        {...listeners}
+        className="flex items-center gap-2 px-4 pt-3 pb-2 border-b border-zinc-100 dark:border-zinc-800 touch-none"
+      >
         {isToday && (
           <span className="text-amber-500 text-xs font-semibold uppercase tracking-wide">Today</span>
         )}
@@ -60,19 +64,14 @@ export default function RootCard({ nodeId }) {
           placeholder="Card title…"
           className="flex-1 text-sm font-semibold text-zinc-700 dark:text-zinc-100"
         />
-        {/* Drag handle */}
-        <button
-          {...attributes}
-          {...listeners}
-          className="flex-shrink-0 text-zinc-300 dark:text-zinc-600 hover:text-zinc-500 cursor-grab active:cursor-grabbing"
-          tabIndex={-1}
-        >
+        {/* Drag handle — visual indicator only */}
+        <span className="flex-shrink-0 text-zinc-300 dark:text-zinc-600" aria-hidden="true">
           <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
             <circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/>
             <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
             <circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/>
           </svg>
-        </button>
+        </span>
         <button
           onClick={() => deleteNode(nodeId)}
           className="flex-shrink-0 text-zinc-300 dark:text-zinc-600 hover:text-red-400 transition-colors"

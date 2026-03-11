@@ -53,20 +53,23 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
       style={{ ...style, paddingLeft: depth > 0 ? `${Math.min(depth * 16, 64)}px` : undefined }}
       className="group relative"
     >
-      <div className={`flex items-start gap-1.5 py-0.5 rounded-lg px-1 -mx-1 hover:bg-zinc-100/60 dark:hover:bg-zinc-800/60 transition-colors ${vis.dimmed ? 'opacity-40' : ''}`}>
-        {/* Drag handle */}
-        <button
-          {...attributes}
-          {...listeners}
-          className="flex-shrink-0 mt-1 opacity-0 group-hover:opacity-40 hover:!opacity-70 cursor-grab active:cursor-grabbing text-zinc-400"
-          tabIndex={-1}
+      {/* Double-tap anywhere then hold to drag */}
+      <div
+        {...attributes}
+        {...listeners}
+        className={`flex items-start gap-1.5 py-0.5 rounded-lg px-1 -mx-1 hover:bg-zinc-100/60 dark:hover:bg-zinc-800/60 transition-colors touch-none ${vis.dimmed ? 'opacity-40' : ''}`}
+      >
+        {/* Drag handle — visual indicator only */}
+        <span
+          className="flex-shrink-0 mt-1 opacity-0 group-hover:opacity-40 text-zinc-400"
+          aria-hidden="true"
         >
           <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
             <circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/>
             <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
             <circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/>
           </svg>
-        </button>
+        </span>
 
         {/* Expand toggle */}
         <button
