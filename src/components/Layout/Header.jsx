@@ -4,7 +4,7 @@ import { signOut } from '../../services/googleAuth.js'
 import { version } from '../../../package.json'
 
 export default function Header() {
-  const { user, setShowDoneToday, showDoneToday, setShowLabelManager, syncStatus, addTodaysTasksCard, todaysTasksRootId, signOut: storeSignOut } = useStore()
+  const { user, setShowDoneToday, showDoneToday, setShowLabelManager, syncStatus, addTodaysTasksCard, todaysTasksRootId, signOut: storeSignOut, dragMode, toggleDragMode } = useStore()
 
   const handleSignOut = () => {
     signOut()
@@ -56,6 +56,18 @@ export default function Header() {
             className="px-3 py-1.5 text-xs rounded-lg font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
           >
             Labels
+          </button>
+
+          <button
+            onClick={toggleDragMode}
+            className={`px-3 py-1.5 text-xs rounded-lg font-medium transition-colors ${
+              dragMode
+                ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-400'
+                : 'text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+            }`}
+            title={dragMode ? 'Exit drag mode' : 'Enter drag mode'}
+          >
+            Drag
           </button>
 
           <ThemeToggle />

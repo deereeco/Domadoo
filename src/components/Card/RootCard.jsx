@@ -8,7 +8,7 @@ import NodeContent from '../Node/NodeContent.jsx'
 
 export default function RootCard({ nodeId }) {
   const node = useStore(s => s.nodes[nodeId])
-  const { updateNodeContent, addChildNode, deleteNode, updateNode } = useStore()
+  const { updateNodeContent, addChildNode, deleteNode, updateNode, dragMode } = useStore()
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: nodeId,
@@ -43,17 +43,17 @@ export default function RootCard({ nodeId }) {
       ref={setNodeRef}
       style={style}
       data-nodeid={nodeId}
+      {...(dragMode ? { ...attributes, ...listeners } : {})}
       className={`break-inside-avoid mb-4 rounded-2xl border transition-shadow ${
         isToday
           ? 'border-amber-300 dark:border-amber-600 bg-amber-50/60 dark:bg-amber-950/30'
           : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900'
-      } ${isOver ? 'ring-2 ring-indigo-400' : ''} shadow-sm hover:shadow-md`}
+      } ${isOver ? 'ring-2 ring-indigo-400' : ''} shadow-sm hover:shadow-md ${dragMode ? 'cursor-grab select-none' : ''}`}
     >
-      {/* Card Header — double-tap anywhere then hold to drag */}
+      {/* Card Header */}
       <div
-        {...attributes}
-        {...listeners}
-        className="flex items-center gap-2 px-4 pt-3 pb-2 border-b border-zinc-100 dark:border-zinc-800 touch-none"
+        {...(!dragMode ? { ...attributes, ...listeners } : {})}
+        className={`flex items-center gap-2 px-4 pt-3 pb-2 border-b border-zinc-100 dark:border-zinc-800 touch-none ${dragMode ? 'pointer-events-none' : ''}`}
       >
         {isToday && (
           <span className="text-amber-500 text-xs font-semibold uppercase tracking-wide">Today</span>
@@ -84,7 +84,7 @@ export default function RootCard({ nodeId }) {
       </div>
 
       {/* Card Body */}
-      <div ref={setDropRef} className="px-3 py-2 min-h-[40px]">
+      <div ref={setDropRef} className={`px-3 py-2 min-h-[40px] ${dragMode ? 'pointer-events-none' : ''}`}>
         <SortableContext items={node.childrenIds} strategy={verticalListSortingStrategy}>
           {node.childrenIds.map(childId => (
             <NodeItem
@@ -105,7 +105,7 @@ export default function RootCard({ nodeId }) {
       </div>
 
       {/* Add item button */}
-      <div className="px-4 pb-3">
+      <div className={`px-4 pb-3 ${dragMode ? 'pointer-events-none' : ''}`}>
         <button
           onClick={() => addChildNode(nodeId)}
           className="flex items-center gap-1.5 text-xs text-zinc-400 dark:text-zinc-600 hover:text-zinc-600 dark:hover:text-zinc-400 transition-colors"

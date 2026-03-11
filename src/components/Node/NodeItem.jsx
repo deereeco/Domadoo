@@ -12,7 +12,7 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
   const node = useStore(s => s.nodes[nodeId])
   const labels = useStore(s => s.labels)
   const { updateNodeContent, toggleComplete, toggleExpand, toggleNodeType,
-          toggleLabelOnNode, deleteNode, openDetailsModal, addChildNode } = useStore()
+          toggleLabelOnNode, deleteNode, openDetailsModal, addChildNode, dragMode } = useStore()
 
   const visibility = useNodeVisibility()
   const vis = visibility[nodeId] ?? { visible: true, dimmed: false, hasHiddenChildren: false }
@@ -53,15 +53,14 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
       style={{ ...style, paddingLeft: depth > 0 ? `${Math.min(depth * 16, 64)}px` : undefined }}
       className="group relative"
     >
-      {/* Double-tap anywhere then hold to drag */}
       <div
         {...attributes}
         {...listeners}
-        className={`flex items-start gap-1.5 py-0.5 rounded-lg px-1 -mx-1 hover:bg-zinc-100/60 dark:hover:bg-zinc-800/60 transition-colors touch-none ${vis.dimmed ? 'opacity-40' : ''}`}
+        className={`flex items-start gap-1.5 py-0.5 rounded-lg px-1 -mx-1 hover:bg-zinc-100/60 dark:hover:bg-zinc-800/60 transition-colors touch-none ${dragMode ? 'cursor-grab select-none' : ''} ${vis.dimmed ? 'opacity-40' : ''}`}
       >
-        {/* Drag handle — visual indicator only */}
+        {/* Drag handle — always visible in drag mode, hover-only otherwise */}
         <span
-          className="flex-shrink-0 mt-1 opacity-0 group-hover:opacity-40 text-zinc-400"
+          className={`flex-shrink-0 mt-1 text-zinc-400 ${dragMode ? 'opacity-40' : 'opacity-0 group-hover:opacity-40'}`}
           aria-hidden="true"
         >
           <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
@@ -70,6 +69,9 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
             <circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/>
           </svg>
         </span>
+
+        {/* Interactive content — disabled in drag mode */}
+        <div className={`flex items-start gap-1.5 flex-1 min-w-0 ${dragMode ? 'pointer-events-none' : ''}`}>
 
         {/* Expand toggle */}
         <button
@@ -215,6 +217,7 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
             </svg>
           </button>
         </div>
+        </div>{/* end interactive content wrapper */}
       </div>
 
       {/* Children */}

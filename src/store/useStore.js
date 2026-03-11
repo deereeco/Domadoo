@@ -14,6 +14,7 @@ const DEFAULT_STATE = {
   showDoneToday: false,
   showLabelManager: false,
   syncStatus: 'idle', // 'idle' | 'saving' | 'error'
+  dragMode: false,
 }
 
 export const useStore = create((set, get) => ({
@@ -22,6 +23,11 @@ export const useStore = create((set, get) => ({
   // ── Hydration ──────────────────────────────────────────────────────────────
   hydrate(data) {
     set({ ...DEFAULT_STATE, ...data })
+  },
+
+  // ── Drag Mode ──────────────────────────────────────────────────────────────
+  toggleDragMode() {
+    set(s => ({ dragMode: !s.dragMode }))
   },
 
   // ── Theme ──────────────────────────────────────────────────────────────────

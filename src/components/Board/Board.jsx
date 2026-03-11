@@ -2,6 +2,7 @@ import { useCallback } from 'react'
 import {
   DndContext,
   DragOverlay,
+  PointerSensor,
   closestCorners,
   useSensor,
   useSensors,
@@ -12,11 +13,11 @@ import { useStore } from '../../store/useStore.js'
 import RootCard from '../Card/RootCard.jsx'
 
 export default function Board() {
-  const { rootOrder, nodes, addRootNode, moveNode, reorderRootCards, reorderChildren } = useStore()
+  const { rootOrder, nodes, addRootNode, moveNode, reorderRootCards, reorderChildren, dragMode } = useStore()
 
-  const sensors = useSensors(
-    useSensor(DoubleTapSensor, { activationConstraint: { delay: 250, tolerance: 8 } })
-  )
+  const pointerSensor = useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+  const doubleTapSensor = useSensor(DoubleTapSensor, { activationConstraint: { delay: 250, tolerance: 8 } })
+  const sensors = useSensors(dragMode ? pointerSensor : doubleTapSensor)
 
   const handleDragEnd = useCallback(({ active, over }) => {
     if (!over || active.id === over.id) return
