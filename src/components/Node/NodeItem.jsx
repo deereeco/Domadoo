@@ -49,6 +49,7 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
   return (
     <div
       ref={(el) => { setNodeRef(el); nodeRef.current = el }}
+      data-nodeid={nodeId}
       style={{ ...style, paddingLeft: depth > 0 ? `${Math.min(depth * 16, 64)}px` : undefined }}
       className="group relative"
     >
