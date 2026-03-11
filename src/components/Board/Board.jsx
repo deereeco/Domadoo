@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import {
   DndContext,
   DragOverlay,
@@ -6,6 +6,7 @@ import {
   closestCorners,
   useSensor,
   useSensors,
+  useDroppable,
 } from '@dnd-kit/core'
 import { DoubleTapSensor } from '../../sensors/DoubleTapSensor.js'
 import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable'
@@ -15,11 +16,22 @@ import RootCard from '../Card/RootCard.jsx'
 export default function Board() {
   const { rootOrder, nodes, addRootNode, moveNode, reorderRootCards, reorderChildren, dragMode } = useStore()
 
+  const [activeDragType, setActiveDragType] = useState(null)
+  const { setNodeRef: setBoardRef, isOver: isBoardOver } = useDroppable({
+    id: 'board-background',
+    data: { type: 'board' },
+  })
+
   const pointerSensor = useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   const doubleTapSensor = useSensor(DoubleTapSensor, { activationConstraint: { delay: 250, tolerance: 8 } })
   const sensors = useSensors(dragMode ? pointerSensor : doubleTapSensor)
 
+  const handleDragStart = useCallback(({ active }) => {
+    setActiveDragType(active.data.current?.type ?? null)
+  }, [])
+
   const handleDragEnd = useCallback(({ active, over }) => {
+    setActiveDragType(null)
     if (!over || active.id === over.id) return
 
     const activeData = active.data.current
@@ -100,7 +112,7 @@ export default function Board() {
   }, [rootOrder, nodes, moveNode, reorderRootCards, reorderChildren])
 
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
+    <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="max-w-screen-xl mx-auto px-4 py-6">
         <SortableContext items={rootOrder} strategy={rectSortingStrategy}>
           <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4">
@@ -128,7 +140,7 @@ export default function Board() {
           </div>
         )}
 
-        {rootOrder.length > 0 && (
+        {rootOrder.length > 0 && !activeDragType && (
           <div className="mt-4">
             <button
               onClick={addRootNode}
@@ -139,6 +151,19 @@ export default function Board() {
               </svg>
               New Card
             </button>
+          </div>
+        )}
+
+        {activeDragType === 'node' && (
+          <div
+            ref={setBoardRef}
+            className={`mt-4 flex items-center justify-center h-16 rounded-2xl border-2 border-dashed transition-colors ${
+              isBoardOver
+                ? 'border-indigo-400 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-500'
+                : 'border-zinc-300 dark:border-zinc-700 text-zinc-400 dark:text-zinc-600'
+            }`}
+          >
+            <span className="text-sm">Drop here to create a new card</span>
           </div>
         )}
       </div>
