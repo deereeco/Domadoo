@@ -51,7 +51,16 @@ export default function App() {
   useSyncDrive()
 
   if (!user) {
-    return <SignIn />
+    return (
+      <>
+        <SignIn />
+        <div
+          onPointerDown={handleDebugTap}
+          className="fixed bottom-0 right-0 w-16 h-16 z-50"
+          aria-hidden="true"
+        />
+      </>
+    )
   }
 
   return (
