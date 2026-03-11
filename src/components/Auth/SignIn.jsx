@@ -11,10 +11,10 @@ export default function SignIn() {
     initGoogleAuth({
       onSignIn: async (token) => {
         const info = await getUserInfo(token)
-        setUser({ name: info.name, email: info.email, picture: info.picture })
-        // Try loading from Drive
+        const user = { name: info.name, email: info.email, picture: info.picture }
         const driveData = await loadFromDrive()
         if (driveData) hydrate(driveData)
+        setUser(user)
       },
     })
   }, [])
