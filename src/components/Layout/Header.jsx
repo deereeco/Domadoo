@@ -1,10 +1,13 @@
+import { useState } from 'react'
 import ThemeToggle from './ThemeToggle.jsx'
+import KeyboardShortcutsHelp from '../UI/KeyboardShortcutsHelp.jsx'
 import { useStore } from '../../store/useStore.js'
 import { signOut } from '../../services/googleAuth.js'
 import { version } from '../../../package.json'
 
 export default function Header() {
   const { user, setShowDoneToday, showDoneToday, setShowLabelManager, syncStatus, addTodaysTasksCard, todaysTasksRootId, signOut: storeSignOut, dragMode, toggleDragMode } = useStore()
+  const [showHelp, setShowHelp] = useState(false)
 
   const handleSignOut = () => {
     signOut()
@@ -70,6 +73,18 @@ export default function Header() {
           >
             Drag
           </button>
+
+          <div className="relative">
+            <button
+              data-testid="keyboard-help-btn"
+              onClick={() => setShowHelp(v => !v)}
+              className="px-2 py-1.5 text-xs rounded-lg font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              title="Keyboard shortcuts"
+            >
+              ?
+            </button>
+            {showHelp && <KeyboardShortcutsHelp onClose={() => setShowHelp(false)} />}
+          </div>
 
           <ThemeToggle />
 

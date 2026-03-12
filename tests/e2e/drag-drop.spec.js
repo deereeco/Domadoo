@@ -5,8 +5,8 @@ import { setupMockState, IDS } from './helpers/mockState.js'
 const nodeHandle = (id) => `[data-testid="node-handle-${id}"]`
 const cardHandle = (id) => `[data-testid="card-handle-${id}"]`
 
-// Count ONLY card root elements (exclude handles and card-list)
-const cardSelector = `[data-testid^="card-"]:not([data-testid^="card-handle-"]):not([data-testid="card-list"])`
+// Count ONLY card root elements (exclude handles, headers, and card-list)
+const cardSelector = `[data-testid^="card-"]:not([data-testid^="card-h"]):not([data-testid="card-list"])`
 // Count ONLY node root elements (exclude handles)
 const nodeSelector = (parentId) =>
   `[data-testid="card-${parentId}"] [data-testid^="node-"]:not([data-testid^="node-handle-"])`

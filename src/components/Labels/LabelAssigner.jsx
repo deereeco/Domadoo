@@ -16,6 +16,7 @@ export default function LabelAssigner({ nodeId, onClose }) {
 
   return (
     <div
+      data-testid="label-assigner"
       className="absolute z-50 top-full left-0 mt-1 w-52 bg-white dark:bg-zinc-800 rounded-xl shadow-lg border border-zinc-200 dark:border-zinc-700 py-2"
       onClick={e => e.stopPropagation()}
     >

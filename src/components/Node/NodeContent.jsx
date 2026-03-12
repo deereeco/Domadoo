@@ -19,6 +19,7 @@ export default function NodeContent({ content, onChange, onKeyDown, className = 
       ref={ref}
       contentEditable
       suppressContentEditableWarning
+      tabIndex={-1}
       onInput={handleInput}
       onKeyDown={onKeyDown}
       data-placeholder={placeholder}

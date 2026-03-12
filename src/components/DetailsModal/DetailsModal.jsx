@@ -37,6 +37,7 @@ export default function DetailsModal() {
       onClick={closeDetailsModal}
     >
       <div
+        data-testid="details-modal"
         className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col border border-zinc-200 dark:border-zinc-700"
         onClick={e => e.stopPropagation()}
       >

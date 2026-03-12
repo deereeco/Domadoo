@@ -34,7 +34,7 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
     data: { type: 'node', nodeId, parentId, depth },
   })
 
-  const handleKeyDown = useKeyboardNav(nodeId, parentId, focusNode)
+  const handleKeyDown = useKeyboardNav(nodeId, parentId, focusNode, () => setShowLabelAssigner(true))
 
   const focusThis = useCallback(() => {
     const el = nodeRef.current?.querySelector('[contenteditable]')
@@ -59,16 +59,27 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
     opacity: isDragging ? 0.5 : vis.dimmed ? 0.45 : 1,
   }
 
+  const handleWrapperKeyDown = useCallback((e) => {
+    if (e.target.contentEditable === 'true') return
+    if (e.key === 'Enter') { e.preventDefault(); focusThis() }
+    if (e.key === ' ') { e.preventDefault(); if (node.type === 'CHECKBOX') toggleComplete(nodeId) }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'd') { e.preventDefault(); openDetailsModal(nodeId) }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'l') { e.preventDefault(); setShowLabelAssigner(true) }
+  }, [node, nodeId, focusThis, toggleComplete, openDetailsModal])
+
   return (
     <div
       ref={(el) => { setNodeRef(el); nodeRef.current = el }}
       data-nodeid={nodeId}
       data-testid={`node-${nodeId}`}
+      tabIndex={0}
+      onKeyDown={handleWrapperKeyDown}
       style={{ ...style, paddingLeft: depth > 0 ? `${Math.min(depth * 16, 64)}px` : undefined }}
-      className="group relative"
+      className="group relative outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:rounded-lg"
     >
       <div
         {...attributes}
+        tabIndex={-1}
         className={`flex items-start gap-1.5 py-0.5 rounded-lg px-1 -mx-1 hover:bg-zinc-100/60 dark:hover:bg-zinc-800/60 transition-colors ${dragMode ? 'cursor-grab select-none' : ''} ${vis.dimmed ? 'opacity-40' : ''} ${isNestTarget ? 'ring-2 ring-indigo-400' : ''}`}
       >
         {/* Drag handle — listeners scoped here so touch-none doesn't block pinch zoom on the rest of the row */}
@@ -104,6 +115,7 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
         {/* Checkbox or bullet */}
         {node.type === 'CHECKBOX' ? (
           <button
+            tabIndex={-1}
             onClick={() => toggleComplete(nodeId)}
             className={`flex-shrink-0 mt-0.5 w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
               isCompleted
@@ -168,6 +180,7 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
           {/* Add child */}
           <button
+            tabIndex={-1}
             onClick={() => { addChildNode(nodeId); toggleExpand(nodeId) && null; useStore.getState().updateNode(nodeId, { uiState: { ...node.uiState, isExpanded: true } }) }}
             className="p-1 rounded text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700"
             title="Add sub-item"
@@ -179,6 +192,7 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
 
           {/* Type toggle */}
           <button
+            tabIndex={-1}
             onClick={() => toggleNodeType(nodeId)}
             className="p-1 rounded text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700"
             title={node.type === 'CHECKBOX' ? 'Switch to bullet' : 'Switch to checkbox'}
@@ -197,6 +211,7 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
           {/* Label assigner */}
           <div className="relative">
             <button
+              tabIndex={-1}
               onClick={() => setShowLabelAssigner(v => !v)}
               className="p-1 rounded text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700"
               title="Add label"
@@ -212,6 +227,7 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
 
           {/* Open details */}
           <button
+            tabIndex={-1}
             onClick={() => openDetailsModal(nodeId)}
             className="p-1 rounded text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700"
             title="Open details"
@@ -224,6 +240,7 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
           {/* Add to Today's Tasks */}
           {canAddToToday && (
             <button
+              tabIndex={-1}
               onClick={() => linkToTodaysTasks(nodeId)}
               className="p-1 rounded text-zinc-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/30"
               title="Add to Today's Tasks"
@@ -237,6 +254,7 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
 
           {/* Delete */}
           <button
+            tabIndex={-1}
             onClick={() => {
               if (hasLinkedRelationship) {
                 setShowDeleteConfirm(true)

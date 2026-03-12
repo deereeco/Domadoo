@@ -21,6 +21,8 @@ export default function RootCard({ nodeId }) {
     data: { type: 'card-body', cardId: nodeId },
   })
 
+  const headerRef = useRef(null)
+
   const focusNode = useCallback((targetId) => {
     // Find the contenteditable in a node and focus it
     setTimeout(() => {
@@ -55,7 +57,17 @@ export default function RootCard({ nodeId }) {
       {/* Card Header — listeners scoped to drag handle icon so touch-none doesn't block pinch zoom on the title */}
       <div
         {...attributes}
-        className={`flex items-center gap-2 px-4 pt-3 pb-2 border-b border-zinc-100 dark:border-zinc-800 ${dragMode ? 'cursor-grab select-none' : ''}`}
+        ref={headerRef}
+        data-testid={`card-header-${nodeId}`}
+        onKeyDown={(e) => {
+          if (e.target.contentEditable === 'true') return
+          if (e.key === 'Enter') {
+            e.preventDefault()
+            const ce = headerRef.current?.querySelector('[contenteditable]')
+            if (ce) { ce.focus(); const r = document.createRange(); r.selectNodeContents(ce); r.collapse(false); const s = window.getSelection(); s.removeAllRanges(); s.addRange(r) }
+          }
+        }}
+        className={`flex items-center gap-2 px-4 pt-3 pb-2 border-b border-zinc-100 dark:border-zinc-800 outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:rounded-t-xl ${dragMode ? 'cursor-grab select-none' : ''}`}
       >
         {/* In drag mode, block interactive children so tap-to-drag works cleanly */}
         <div className={`flex items-center gap-2 flex-1 min-w-0 ${dragMode ? 'pointer-events-none' : 'contents'}`}>
@@ -67,6 +79,13 @@ export default function RootCard({ nodeId }) {
             onChange={val => updateNodeContent(nodeId, val)}
             placeholder="Card title…"
             className="flex-1 text-sm font-semibold text-zinc-700 dark:text-zinc-100"
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                e.preventDefault()
+                e.currentTarget.blur()
+                headerRef.current?.focus()
+              }
+            }}
           />
           {/* Drag handle — touch-none scoped here so pinch zoom works on card title area */}
           <span {...listeners} data-testid={`card-handle-${nodeId}`} className="flex-shrink-0 text-zinc-300 dark:text-zinc-600 touch-none" style={{ pointerEvents: 'auto' }} aria-hidden="true">
@@ -126,6 +145,7 @@ export default function RootCard({ nodeId }) {
       {/* Add item button */}
       <div className={`px-4 pb-3 ${dragMode ? 'pointer-events-none' : ''}`}>
         <button
+          tabIndex={-1}
           data-testid={`add-item-${nodeId}`}
           onClick={() => addChildNode(nodeId)}
           className="flex items-center gap-1.5 text-xs text-zinc-400 dark:text-zinc-600 hover:text-zinc-600 dark:hover:text-zinc-400 transition-colors"

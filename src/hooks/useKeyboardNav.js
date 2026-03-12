@@ -1,8 +1,9 @@
 import { useCallback } from 'react'
 import { useStore } from '../store/useStore.js'
 
-export function useKeyboardNav(nodeId, parentId, focusNode) {
+export function useKeyboardNav(nodeId, parentId, focusNode, onOpenLabelAssigner) {
   const store = useStore()
+  const openDetailsModal = useStore(s => s.openDetailsModal)
 
   const handleKeyDown = useCallback((e) => {
     const { nodes } = store
@@ -76,7 +77,24 @@ export function useKeyboardNav(nodeId, parentId, focusNode) {
       store.deleteNode(nodeId)
       setTimeout(() => focusNode && focusNode(prevId), 0)
     }
-  }, [nodeId, parentId, store, focusNode])
+
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      e.currentTarget.blur()
+      const wrapper = e.currentTarget.closest('[data-nodeid]')
+      if (wrapper) wrapper.focus()
+    }
+
+    if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
+      e.preventDefault()
+      openDetailsModal(nodeId)
+    }
+
+    if ((e.ctrlKey || e.metaKey) && e.key === 'l') {
+      e.preventDefault()
+      onOpenLabelAssigner && onOpenLabelAssigner()
+    }
+  }, [nodeId, parentId, store, focusNode, openDetailsModal, onOpenLabelAssigner])
 
   return handleKeyDown
 }

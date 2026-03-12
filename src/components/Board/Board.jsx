@@ -11,6 +11,7 @@ import {
 import { DoubleTapSensor } from '../../sensors/DoubleTapSensor.js'
 import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable'
 import { useStore } from '../../store/useStore.js'
+import { useBoardKeyNav } from '../../hooks/useBoardKeyNav.js'
 import RootCard from '../Card/RootCard.jsx'
 
 // Must be a separate component so useDroppable runs inside DndContext's tree
@@ -33,6 +34,7 @@ function BoardDropZone({ activeDragType }) {
 
 export default function Board() {
   const { rootOrder, nodes, addRootNode, moveNode, reorderRootCards, reorderChildren, dragMode, linkToTodaysTasks, todaysTasksRootId, setNestTarget, clearNestTarget, setNestZoneActive } = useStore()
+  useBoardKeyNav()
 
   const [activeDragType, setActiveDragType] = useState(null)
   const nestTimerRef = useRef(null)
