@@ -16,9 +16,9 @@ import RootCard from '../Card/RootCard.jsx'
 function zoneAwareCollision(args) {
   const collisions = pointerWithin(args)
   return collisions.map(collision => {
-    const droppable = args.droppables.get(collision.id)
+    const droppable = args.droppableContainers.find(d => d.id === collision.id)
     if (droppable?.data?.current?.type !== 'node') return collision
-    const rect = droppable.rect.current
+    const rect = args.droppableRects.get(collision.id)
     if (!rect || !args.pointerCoordinates) return collision
     const rel = args.pointerCoordinates.y - rect.top
     const zone = rel < rect.height / 3 ? 'top' : rel > (rect.height * 2) / 3 ? 'bottom' : 'middle'
