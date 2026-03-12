@@ -1,4 +1,4 @@
-import { useCallback, useState, useRef } from 'react'
+import { useCallback, useState, useRef, useEffect } from 'react'
 import {
   DndContext,
   DragOverlay,
@@ -32,6 +32,40 @@ export default function Board() {
   const [activeDragType, setActiveDragType] = useState(null)
   const nestTimerRef = useRef(null)
   const currentNestOverRef = useRef(null)
+
+  // Zoom reset
+  const [isZoomed, setIsZoomed] = useState(false)
+  const bgTapRef = useRef(null)
+
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+    const check = () => setIsZoomed(vv.scale > 1.05)
+    vv.addEventListener('resize', check)
+    return () => vv.removeEventListener('resize', check)
+  }, [])
+
+  const resetZoom = useCallback(() => {
+    const meta = document.querySelector('meta[name="viewport"]')
+    if (!meta) return
+    const orig = meta.content
+    meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0'
+    setTimeout(() => { meta.content = orig }, 300)
+  }, [])
+
+  const handleBgTap = useCallback((e) => {
+    // Only trigger on the board background, not on card/task elements
+    if (e.target.closest('[data-nodeid]')) return
+    const now = Date.now()
+    if (bgTapRef.current && now - bgTapRef.current < 350 && window.visualViewport?.scale > 1.05) {
+      resetZoom()
+      bgTapRef.current = null
+    } else {
+      bgTapRef.current = now
+      setTimeout(() => { bgTapRef.current = null }, 350)
+    }
+  }, [resetZoom])
+
   const { setNodeRef: setBoardRef, isOver: isBoardOver } = useDroppable({
     id: 'board-background',
     data: { type: 'board' },
@@ -165,7 +199,15 @@ export default function Board() {
 
   return (
     <DndContext sensors={sensors} collisionDetection={zoneAwareCollision} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
-      <div className="max-w-screen-xl mx-auto px-4 py-6">
+      {isZoomed && (
+        <button
+          onClick={resetZoom}
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full bg-zinc-800/90 dark:bg-zinc-700/90 text-white text-sm shadow-lg backdrop-blur-sm"
+        >
+          Reset zoom
+        </button>
+      )}
+      <div onClick={handleBgTap} className="max-w-screen-xl mx-auto px-4 py-6">
         <SortableContext items={rootOrder} strategy={rectSortingStrategy}>
           <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4">
             {rootOrder.map(id => (

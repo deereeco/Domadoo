@@ -49,11 +49,10 @@ export default function RootCard({ nodeId }) {
           : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900'
       } ${isOver ? 'ring-2 ring-indigo-400' : ''} shadow-sm hover:shadow-md`}
     >
-      {/* Card Header — drag handle (touch-none keeps touch-action:none for mobile) */}
+      {/* Card Header — listeners scoped to drag handle icon so touch-none doesn't block pinch zoom on the title */}
       <div
         {...attributes}
-        {...listeners}
-        className={`flex items-center gap-2 px-4 pt-3 pb-2 border-b border-zinc-100 dark:border-zinc-800 touch-none ${dragMode ? 'cursor-grab select-none' : ''}`}
+        className={`flex items-center gap-2 px-4 pt-3 pb-2 border-b border-zinc-100 dark:border-zinc-800 ${dragMode ? 'cursor-grab select-none' : ''}`}
       >
         {/* In drag mode, block interactive children so tap-to-drag works cleanly */}
         <div className={`flex items-center gap-2 flex-1 min-w-0 ${dragMode ? 'pointer-events-none' : 'contents'}`}>
@@ -66,8 +65,8 @@ export default function RootCard({ nodeId }) {
             placeholder="Card title…"
             className="flex-1 text-sm font-semibold text-zinc-700 dark:text-zinc-100"
           />
-          {/* Drag handle — visual indicator only */}
-          <span className="flex-shrink-0 text-zinc-300 dark:text-zinc-600" aria-hidden="true">
+          {/* Drag handle — touch-none scoped here so pinch zoom works on card title area */}
+          <span {...listeners} className="flex-shrink-0 text-zinc-300 dark:text-zinc-600 touch-none" aria-hidden="true">
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
               <circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/>
               <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>

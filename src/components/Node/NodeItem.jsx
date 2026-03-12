@@ -68,12 +68,12 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
     >
       <div
         {...attributes}
-        {...listeners}
-        className={`flex items-start gap-1.5 py-0.5 rounded-lg px-1 -mx-1 hover:bg-zinc-100/60 dark:hover:bg-zinc-800/60 transition-colors touch-none ${dragMode ? 'cursor-grab select-none' : ''} ${vis.dimmed ? 'opacity-40' : ''} ${isNestTarget ? 'ring-2 ring-indigo-400' : ''}`}
+        className={`flex items-start gap-1.5 py-0.5 rounded-lg px-1 -mx-1 hover:bg-zinc-100/60 dark:hover:bg-zinc-800/60 transition-colors ${dragMode ? 'cursor-grab select-none' : ''} ${vis.dimmed ? 'opacity-40' : ''} ${isNestTarget ? 'ring-2 ring-indigo-400' : ''}`}
       >
-        {/* Drag handle — always visible in drag mode, hover-only otherwise */}
+        {/* Drag handle — listeners scoped here so touch-none doesn't block pinch zoom on the rest of the row */}
         <span
-          className={`flex-shrink-0 mt-1 text-zinc-400 ${dragMode ? 'opacity-40' : 'opacity-0 group-hover:opacity-40'}`}
+          {...listeners}
+          className={`flex-shrink-0 mt-1 text-zinc-400 touch-none ${dragMode ? 'opacity-40' : 'opacity-20 group-hover:opacity-60'}`}
           aria-hidden="true"
         >
           <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
