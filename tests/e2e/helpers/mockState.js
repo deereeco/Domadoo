@@ -6,6 +6,7 @@ export const IDS = {
   TASK_A2: 'test-node-a200-0000-0000-000000000004',
   TASK_B1: 'test-node-b100-0000-0000-000000000005',
   TASK_B2: 'test-node-b200-0000-0000-000000000006',
+  TODAY_LABEL: 'system-today-label-0000-000000000000',
 }
 
 function node(id, parentId, childrenIds, content) {
@@ -40,11 +41,13 @@ export const MOCK_STATE = {
     [IDS.TASK_B1]: node(IDS.TASK_B1, IDS.CARD_B, [], 'Task B1'),
     [IDS.TASK_B2]: node(IDS.TASK_B2, IDS.CARD_B, [], 'Task B2'),
   },
-  labels: {},
+  labels: {
+    [IDS.TODAY_LABEL]: { id: IDS.TODAY_LABEL, name: 'Today', color: '#FCD34D', isSystem: true },
+  },
   rootOrder: [IDS.CARD_A, IDS.CARD_B],
   activeFilters: {},
   todaysTasksRootId: null,
-  todaysTasksLabelId: null,
+  todaysTasksLabelId: IDS.TODAY_LABEL,
   theme: 'light',
   dragMode: false, // tests enable drag mode explicitly via the Drag toggle button
   nestTargetId: null,

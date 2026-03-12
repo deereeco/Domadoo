@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useStore } from '../../store/useStore.js'
 
 export default function LabelAssigner({ nodeId, onClose }) {
-  const { labels, nodes, toggleLabelOnNode } = useStore()
+  const { labels, nodes, toggleLabelOnNode, todaysTasksLabelId } = useStore()
   const node = nodes[nodeId]
   const [search, setSearch] = useState('')
   const inputRef = useRef(null)
@@ -10,7 +10,8 @@ export default function LabelAssigner({ nodeId, onClose }) {
   useEffect(() => { inputRef.current?.focus() }, [])
 
   const filtered = Object.values(labels).filter(l =>
-    !l.isSystem && l.name.toLowerCase().includes(search.toLowerCase())
+    (!l.isSystem || l.id === todaysTasksLabelId) &&
+    l.name.toLowerCase().includes(search.toLowerCase())
   )
 
   return (

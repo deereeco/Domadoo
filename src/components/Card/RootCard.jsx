@@ -8,7 +8,8 @@ import NodeContent from '../Node/NodeContent.jsx'
 
 export default function RootCard({ nodeId }) {
   const node = useStore(s => s.nodes[nodeId])
-  const { updateNodeContent, addChildNode, deleteNode, updateNode, dragMode } = useStore()
+  const { updateNodeContent, addChildNode, deleteNode, updateNode, dragMode,
+          toggleLabelOnNode, todaysTasksLabelId } = useStore()
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: nodeId,
@@ -31,6 +32,7 @@ export default function RootCard({ nodeId }) {
   if (!node) return null
 
   const isToday = node.isTodaysTask
+  const hasTodayLabel = node.labelIds?.includes(todaysTasksLabelId)
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -43,7 +45,7 @@ export default function RootCard({ nodeId }) {
       ref={setNodeRef}
       style={style}
       data-nodeid={nodeId}
-      data-testid={`card-${nodeId}`}
+      data-testid={isToday ? 'today-tasks-card' : `card-${nodeId}`}
       className={`break-inside-avoid mb-4 rounded-2xl border transition-shadow ${
         isToday
           ? 'border-amber-300 dark:border-amber-600 bg-amber-50/60 dark:bg-amber-950/30'
@@ -74,6 +76,20 @@ export default function RootCard({ nodeId }) {
               <circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/>
             </svg>
           </span>
+          {!isToday && todaysTasksLabelId && (
+            <button
+              data-testid={`today-toggle-card-${nodeId}`}
+              onClick={() => toggleLabelOnNode(nodeId, todaysTasksLabelId)}
+              className={`flex-shrink-0 transition-colors ${hasTodayLabel ? 'text-amber-400' : 'text-zinc-300 dark:text-zinc-600 hover:text-amber-400'}`}
+              title={hasTodayLabel ? 'Remove from Today\'s Tasks' : 'Add to Today\'s Tasks'}
+              tabIndex={-1}
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <circle cx="12" cy="12" r="4" strokeWidth={2} />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+              </svg>
+            </button>
+          )}
           <button
             onClick={() => deleteNode(nodeId)}
             className="flex-shrink-0 text-zinc-300 dark:text-zinc-600 hover:text-red-400 transition-colors"

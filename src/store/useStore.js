@@ -2,13 +2,16 @@ import { create } from 'zustand'
 import { createNode, createLabel } from '../types/index.js'
 import { saveToCache, loadFromCache, saveUser, loadUser, clearUser } from '../services/localCache.js'
 
+const SYSTEM_TODAY_LABEL_ID = 'system-today-label-0000-000000000000'
+const SYSTEM_TODAY_LABEL = { id: SYSTEM_TODAY_LABEL_ID, name: 'Today', color: '#FCD34D', isSystem: true }
+
 const DEFAULT_STATE = {
   nodes: {},
-  labels: {},
+  labels: { [SYSTEM_TODAY_LABEL_ID]: SYSTEM_TODAY_LABEL },
   rootOrder: [],
   activeFilters: {},
   todaysTasksRootId: null,
-  todaysTasksLabelId: null,
+  todaysTasksLabelId: SYSTEM_TODAY_LABEL_ID,
   theme: 'dark',
   user: null,
   detailsModalNodeId: null,
@@ -25,7 +28,9 @@ export const useStore = create((set, get) => ({
 
   // ── Hydration ──────────────────────────────────────────────────────────────
   hydrate(data) {
-    set({ ...DEFAULT_STATE, ...data })
+    // Ensure Today system label always exists (backward compat with old saves)
+    const labels = { [SYSTEM_TODAY_LABEL_ID]: SYSTEM_TODAY_LABEL, ...data.labels }
+    set({ ...DEFAULT_STATE, ...data, labels, todaysTasksLabelId: SYSTEM_TODAY_LABEL_ID })
   },
 
   // ── Drag Mode ──────────────────────────────────────────────────────────────
@@ -69,13 +74,11 @@ export const useStore = create((set, get) => ({
   addTodaysTasksCard() {
     const node = createNode({ parentId: null, content: "Today's Tasks" })
     node.isTodaysTask = true
-    const todayLabel = createLabel({ name: 'Today', color: '#FCD34D', isSystem: true })
     set(state => ({
       nodes: { ...state.nodes, [node.id]: node },
-      labels: { ...state.labels, [todayLabel.id]: todayLabel },
       rootOrder: [node.id, ...state.rootOrder],
       todaysTasksRootId: node.id,
-      todaysTasksLabelId: todayLabel.id,
+      // todaysTasksLabelId already set (SYSTEM_TODAY_LABEL_ID) — don't overwrite
     }))
     return node.id
   },
@@ -431,6 +434,33 @@ export const useStore = create((set, get) => ({
   },
 
   toggleLabelOnNode(nodeId, labelId) {
+    // Handle Today label specially — drives Today's Tasks linking
+    if (labelId === SYSTEM_TODAY_LABEL_ID) {
+      const state = get()
+      const node = state.nodes[nodeId]
+      if (!node) return
+      const hasLabel = node.labelIds.includes(labelId)
+      if (hasLabel) {
+        // Remove Today label → unlink from Today's Tasks
+        const linkedId = node.linkedNodeIds.find(lid => state.nodes[lid]?.isTodaysTask)
+        if (linkedId) {
+          get().unlinkFromTodaysTasks(linkedId)
+        } else {
+          // Edge case: label present but no linked copy — just remove the label
+          set(s => {
+            const n = s.nodes[nodeId]
+            if (!n) return {}
+            return { nodes: { ...s.nodes, [nodeId]: { ...n, labelIds: n.labelIds.filter(l => l !== labelId) } } }
+          })
+        }
+      } else {
+        // Add Today label → create Today's Tasks card if needed, then link
+        if (!get().todaysTasksRootId) get().addTodaysTasksCard()
+        get().linkToTodaysTasks(nodeId)
+      }
+      return
+    }
+    // Normal label toggle
     set(state => {
       const node = state.nodes[nodeId]
       if (!node) return {}
