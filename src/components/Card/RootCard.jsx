@@ -61,6 +61,42 @@ export default function RootCard({ nodeId }) {
         data-testid={`card-header-${nodeId}`}
         onKeyDown={(e) => {
           if (e.target.contentEditable === 'true') return
+          const CARD_SEL = '[data-testid^="card-"]:not([data-testid^="card-h"]):not([data-testid="card-list"])'
+
+          // Tab / Shift+Tab — jump to next/prev card header
+          if (e.key === 'Tab') {
+            e.preventDefault()
+            const cards = [...document.querySelectorAll(CARD_SEL)]
+            const cardEl = e.currentTarget.closest(CARD_SEL)
+            const cardIdx = cards.indexOf(cardEl)
+            const target = e.shiftKey ? cards[cardIdx - 1] : cards[cardIdx + 1]
+            target?.querySelector('[data-testid^="card-header-"]')?.focus()
+            return
+          }
+
+          // ↓ — focus first task in this card
+          if (e.key === 'ArrowDown') {
+            e.preventDefault()
+            const cardEl = e.currentTarget.closest(CARD_SEL)
+            cardEl?.querySelector('[data-testid^="node-"]:not([data-testid^="node-handle-"])')?.focus()
+            return
+          }
+
+          // ↑ — focus last task in previous card (or prev card header if empty)
+          if (e.key === 'ArrowUp') {
+            e.preventDefault()
+            const cards = [...document.querySelectorAll(CARD_SEL)]
+            const cardEl = e.currentTarget.closest(CARD_SEL)
+            const prevCard = cards[cards.indexOf(cardEl) - 1]
+            if (prevCard) {
+              const prevNodes = [...prevCard.querySelectorAll('[data-testid^="node-"]:not([data-testid^="node-handle-"])')]
+              if (prevNodes.length) prevNodes[prevNodes.length - 1].focus()
+              else prevCard.querySelector('[data-testid^="card-header-"]')?.focus()
+            }
+            return
+          }
+
+          // Enter — focus title contentEditable
           if (e.key === 'Enter') {
             e.preventDefault()
             const ce = headerRef.current?.querySelector('[contenteditable]')

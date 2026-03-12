@@ -59,13 +59,72 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
     opacity: isDragging ? 0.5 : vis.dimmed ? 0.45 : 1,
   }
 
+  const CARD_SEL = '[data-testid^="card-"]:not([data-testid^="card-h"]):not([data-testid="card-list"])'
+
   const handleWrapperKeyDown = useCallback((e) => {
     if (e.target.contentEditable === 'true') return
+
+    // ↑ / ↓ — move within same card
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault()
+      const cardEl = e.currentTarget.closest(CARD_SEL)
+      if (!cardEl) return
+      const nodes = [...cardEl.querySelectorAll('[data-testid^="node-"]:not([data-testid^="node-handle-"])')]
+      const idx = nodes.indexOf(e.currentTarget)
+      if (e.key === 'ArrowDown') {
+        nodes[idx + 1]?.focus()
+      } else {
+        if (idx > 0) nodes[idx - 1].focus()
+        else cardEl.querySelector('[data-testid^="card-header-"]')?.focus()
+      }
+      return
+    }
+
+    // → — expand collapsed node, or focus first child if already expanded
+    if (e.key === 'ArrowRight') {
+      e.preventDefault()
+      if (node.childrenIds.length > 0) {
+        if (!node.uiState.isExpanded) {
+          toggleExpand(nodeId)
+        } else {
+          const cardEl = e.currentTarget.closest(CARD_SEL)
+          if (!cardEl) return
+          const nodes = [...cardEl.querySelectorAll('[data-testid^="node-"]:not([data-testid^="node-handle-"])')]
+          const idx = nodes.indexOf(e.currentTarget)
+          nodes[idx + 1]?.focus()
+        }
+      }
+      return
+    }
+
+    // ← — collapse expanded node, or jump to parent
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault()
+      if (node.uiState.isExpanded && node.childrenIds.length > 0) {
+        toggleExpand(nodeId)
+      } else if (parentId) {
+        document.querySelector(`[data-testid="node-${parentId}"]`)?.focus()
+      }
+      return
+    }
+
+    // Tab / Shift+Tab — jump to next/prev card header
+    if (e.key === 'Tab') {
+      e.preventDefault()
+      const cards = [...document.querySelectorAll(CARD_SEL)]
+      const cardEl = e.currentTarget.closest(CARD_SEL)
+      if (!cardEl) return
+      const cardIdx = cards.indexOf(cardEl)
+      const target = e.shiftKey ? cards[cardIdx - 1] : cards[cardIdx + 1]
+      target?.querySelector('[data-testid^="card-header-"]')?.focus()
+      return
+    }
+
     if (e.key === 'Enter') { e.preventDefault(); focusThis() }
     if (e.key === ' ') { e.preventDefault(); if (node.type === 'CHECKBOX') toggleComplete(nodeId) }
     if ((e.ctrlKey || e.metaKey) && e.key === 'd') { e.preventDefault(); openDetailsModal(nodeId) }
     if ((e.ctrlKey || e.metaKey) && e.key === 'l') { e.preventDefault(); setShowLabelAssigner(true) }
-  }, [node, nodeId, focusThis, toggleComplete, openDetailsModal])
+  }, [node, nodeId, parentId, focusThis, toggleComplete, openDetailsModal, toggleExpand])
 
   return (
     <div

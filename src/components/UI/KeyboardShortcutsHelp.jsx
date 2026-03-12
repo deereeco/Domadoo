@@ -1,8 +1,11 @@
 import { useEffect, useRef } from 'react'
 
 const SHORTCUTS = [
-  { ctx: 'Navigate', key: 'Tab', action: 'Next field' },
-  { ctx: 'Navigate', key: 'Shift+Tab', action: 'Previous field' },
+  { ctx: 'Navigate', key: '↑ / ↓', action: 'Prev / next task in card' },
+  { ctx: 'Navigate', key: '→', action: 'Expand / enter subtasks' },
+  { ctx: 'Navigate', key: '←', action: 'Collapse / go to parent' },
+  { ctx: 'Navigate', key: 'Tab', action: 'Jump to next card' },
+  { ctx: 'Navigate', key: 'Shift+Tab', action: 'Jump to prev card' },
   { ctx: 'Navigate', key: 'Enter', action: 'Start editing' },
   { ctx: 'Navigate', key: 'Space', action: 'Toggle checkbox' },
   { ctx: 'Navigate', key: 'Ctrl+D', action: 'Open details' },

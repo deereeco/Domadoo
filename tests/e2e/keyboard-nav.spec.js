@@ -1,16 +1,24 @@
 import { test, expect } from '@playwright/test'
 import { setupMockState, IDS } from './helpers/mockState.js'
 
-// Helper: which element currently has focus?
+// Helpers
 const focusedTestId = (page) =>
   page.evaluate(() => document.activeElement?.dataset?.testid ?? null)
 
 const isContentEditableFocused = (page) =>
   page.evaluate(() => document.activeElement?.contentEditable === 'true')
 
-// Focus a node wrapper or card header directly
 const focusEl = (page, testId) =>
   page.locator(`[data-testid="${testId}"]`).focus()
+
+// Indent TASK_A2 under TASK_A1 to create a parent→child relationship for expand/collapse tests
+async function indentA2UnderA1(page) {
+  await focusEl(page, `node-${IDS.TASK_A2}`)
+  await page.keyboard.press('Enter')   // enter edit mode
+  await page.keyboard.press('Tab')     // indent under TASK_A1
+  await page.waitForTimeout(150)
+  await page.keyboard.press('Escape')  // return to nav mode
+}
 
 test.beforeEach(async ({ page }) => {
   await setupMockState(page)
@@ -18,14 +26,13 @@ test.beforeEach(async ({ page }) => {
   await page.waitForSelector('[data-testid="board"]')
 })
 
-// ─── Tab-through navigation ────────────────────────────────────────────────
+// ─── Card header keyboard nav ──────────────────────────────────────────────
 
-test.describe('Tab-through navigation', () => {
+test.describe('Card header keyboard nav', () => {
   test('Enter on focused card header starts editing title', async ({ page }) => {
     await focusEl(page, `card-header-${IDS.CARD_A}`)
     await page.keyboard.press('Enter')
     expect(await isContentEditableFocused(page)).toBe(true)
-    // The focused element should be inside the card header
     const insideCard = await page.evaluate((cardId) => {
       const el = document.activeElement
       return !!el?.closest(`[data-testid="card-header-${cardId}"]`)
@@ -39,48 +46,135 @@ test.describe('Tab-through navigation', () => {
     expect(await isContentEditableFocused(page)).toBe(true)
     await page.keyboard.press('Escape')
     expect(await isContentEditableFocused(page)).toBe(false)
-    const focused = await focusedTestId(page)
-    expect(focused).toBe(`card-header-${IDS.CARD_A}`)
+    expect(await focusedTestId(page)).toBe(`card-header-${IDS.CARD_A}`)
   })
 
-  test('Tab from card header focuses first task', async ({ page }) => {
+  test('Tab from card header jumps to next card header', async ({ page }) => {
     await focusEl(page, `card-header-${IDS.CARD_A}`)
     await page.keyboard.press('Tab')
-    const focused = await focusedTestId(page)
-    expect(focused).toBe(`node-${IDS.TASK_A1}`)
+    expect(await focusedTestId(page)).toBe(`card-header-${IDS.CARD_B}`)
   })
 
-  test('Tab through all tasks in DFS order', async ({ page }) => {
+  test('Shift+Tab from card header jumps to prev card header', async ({ page }) => {
+    await focusEl(page, `card-header-${IDS.CARD_B}`)
+    await page.keyboard.press('Shift+Tab')
+    expect(await focusedTestId(page)).toBe(`card-header-${IDS.CARD_A}`)
+  })
+
+  test('Tab from last card header does nothing (no wrap)', async ({ page }) => {
+    await focusEl(page, `card-header-${IDS.CARD_B}`)
+    await page.keyboard.press('Tab')
+    // Still on card B header (no next card)
+    expect(await focusedTestId(page)).toBe(`card-header-${IDS.CARD_B}`)
+  })
+
+  test('↓ from card header focuses first task in that card', async ({ page }) => {
     await focusEl(page, `card-header-${IDS.CARD_A}`)
-    const sequence = [
-      `node-${IDS.TASK_A1}`,
-      `node-${IDS.TASK_A2}`,
-      `card-header-${IDS.CARD_B}`,
-      `node-${IDS.TASK_B1}`,
-      `node-${IDS.TASK_B2}`,
-    ]
-    for (const testId of sequence) {
-      await page.keyboard.press('Tab')
-      const focused = await focusedTestId(page)
-      expect(focused).toBe(testId)
-    }
+    await page.keyboard.press('ArrowDown')
+    expect(await focusedTestId(page)).toBe(`node-${IDS.TASK_A1}`)
   })
 
-  test('Shift+Tab goes backward', async ({ page }) => {
-    // Start at the last task and go backward
-    await focusEl(page, `node-${IDS.TASK_B2}`)
-    const sequence = [
-      `node-${IDS.TASK_B1}`,
-      `card-header-${IDS.CARD_B}`,
-      `node-${IDS.TASK_A2}`,
-      `node-${IDS.TASK_A1}`,
-      `card-header-${IDS.CARD_A}`,
-    ]
-    for (const testId of sequence) {
-      await page.keyboard.press('Shift+Tab')
-      const focused = await focusedTestId(page)
-      expect(focused).toBe(testId)
-    }
+  test('↑ from card header focuses last task in previous card', async ({ page }) => {
+    await focusEl(page, `card-header-${IDS.CARD_B}`)
+    await page.keyboard.press('ArrowUp')
+    expect(await focusedTestId(page)).toBe(`node-${IDS.TASK_A2}`)
+  })
+
+  test('↑ from first card header does nothing', async ({ page }) => {
+    await focusEl(page, `card-header-${IDS.CARD_A}`)
+    await page.keyboard.press('ArrowUp')
+    // Still on card A header (no previous card)
+    expect(await focusedTestId(page)).toBe(`card-header-${IDS.CARD_A}`)
+  })
+})
+
+// ─── Arrow key navigation within a card ───────────────────────────────────
+
+test.describe('Arrow key navigation within a card', () => {
+  test('↓ moves to next task in same card', async ({ page }) => {
+    await focusEl(page, `node-${IDS.TASK_A1}`)
+    await page.keyboard.press('ArrowDown')
+    expect(await focusedTestId(page)).toBe(`node-${IDS.TASK_A2}`)
+  })
+
+  test('↑ moves to previous task in same card', async ({ page }) => {
+    await focusEl(page, `node-${IDS.TASK_A2}`)
+    await page.keyboard.press('ArrowUp')
+    expect(await focusedTestId(page)).toBe(`node-${IDS.TASK_A1}`)
+  })
+
+  test('↑ from first task focuses card header', async ({ page }) => {
+    await focusEl(page, `node-${IDS.TASK_A1}`)
+    await page.keyboard.press('ArrowUp')
+    expect(await focusedTestId(page)).toBe(`card-header-${IDS.CARD_A}`)
+  })
+
+  test('↓ from last task stays put (no wrap)', async ({ page }) => {
+    await focusEl(page, `node-${IDS.TASK_A2}`)
+    await page.keyboard.press('ArrowDown')
+    // Still on TASK_A2 — bottom of card, no next task
+    expect(await focusedTestId(page)).toBe(`node-${IDS.TASK_A2}`)
+  })
+
+  test('Tab from a task jumps to next card header', async ({ page }) => {
+    await focusEl(page, `node-${IDS.TASK_A1}`)
+    await page.keyboard.press('Tab')
+    expect(await focusedTestId(page)).toBe(`card-header-${IDS.CARD_B}`)
+  })
+
+  test('Shift+Tab from a task jumps to prev card header', async ({ page }) => {
+    await focusEl(page, `node-${IDS.TASK_B1}`)
+    await page.keyboard.press('Shift+Tab')
+    expect(await focusedTestId(page)).toBe(`card-header-${IDS.CARD_A}`)
+  })
+})
+
+// ─── Arrow → / ← expand, collapse, parent ─────────────────────────────────
+
+test.describe('Arrow → / ← expand, collapse, parent navigation', () => {
+  test('→ on expanded node with children focuses first child', async ({ page }) => {
+    await indentA2UnderA1(page)
+    // TASK_A1 now has TASK_A2 as child and is expanded
+    await focusEl(page, `node-${IDS.TASK_A1}`)
+    await page.keyboard.press('ArrowRight')
+    expect(await focusedTestId(page)).toBe(`node-${IDS.TASK_A2}`)
+  })
+
+  test('→ on collapsed node expands it', async ({ page }) => {
+    await indentA2UnderA1(page)
+    await focusEl(page, `node-${IDS.TASK_A1}`)
+    // Collapse it first
+    await page.keyboard.press('ArrowLeft')
+    await page.waitForTimeout(100)
+    // TASK_A2 should be hidden
+    await expect(page.locator(`[data-testid="node-${IDS.TASK_A2}"]`)).not.toBeVisible()
+    // Now → should expand
+    await page.keyboard.press('ArrowRight')
+    await page.waitForTimeout(100)
+    await expect(page.locator(`[data-testid="node-${IDS.TASK_A2}"]`)).toBeVisible()
+  })
+
+  test('→ on a leaf node (no children) does nothing', async ({ page }) => {
+    await focusEl(page, `node-${IDS.TASK_A1}`)
+    await page.keyboard.press('ArrowRight')
+    // Still focused on TASK_A1
+    expect(await focusedTestId(page)).toBe(`node-${IDS.TASK_A1}`)
+  })
+
+  test('← on expanded node collapses it', async ({ page }) => {
+    await indentA2UnderA1(page)
+    await focusEl(page, `node-${IDS.TASK_A1}`)
+    await page.keyboard.press('ArrowLeft')
+    await page.waitForTimeout(100)
+    await expect(page.locator(`[data-testid="node-${IDS.TASK_A2}"]`)).not.toBeVisible()
+  })
+
+  test('← on collapsed child focuses parent', async ({ page }) => {
+    await indentA2UnderA1(page)
+    await focusEl(page, `node-${IDS.TASK_A2}`)
+    // TASK_A2 has no children so ← goes to parent (TASK_A1)
+    await page.keyboard.press('ArrowLeft')
+    expect(await focusedTestId(page)).toBe(`node-${IDS.TASK_A1}`)
   })
 })
 
@@ -89,11 +183,9 @@ test.describe('Tab-through navigation', () => {
 test.describe('Navigation mode actions', () => {
   test('Space on focused CHECKBOX task toggles it to COMPLETED', async ({ page }) => {
     await focusEl(page, `node-${IDS.TASK_A1}`)
-    // Confirm it's not completed yet
     const checkboxBefore = page.locator(`[data-testid="node-${IDS.TASK_A1}"] button[class*="rounded"][class*="border"]`).first()
     await expect(checkboxBefore).not.toHaveClass(/bg-emerald/)
     await page.keyboard.press(' ')
-    // After space, checkbox should be completed
     const checkboxAfter = page.locator(`[data-testid="node-${IDS.TASK_A1}"] button[class*="bg-emerald"]`).first()
     await expect(checkboxAfter).toBeVisible()
   })
@@ -101,16 +193,13 @@ test.describe('Navigation mode actions', () => {
   test('Ctrl+D on focused task opens the details modal', async ({ page }) => {
     await focusEl(page, `node-${IDS.TASK_A1}`)
     await page.keyboard.press('Control+d')
-    // Details modal should appear — it shows breadcrumbs / node content
-    const modal = page.locator('[data-testid="details-modal"]')
-    await expect(modal).toBeVisible()
+    await expect(page.locator('[data-testid="details-modal"]')).toBeVisible()
   })
 
   test('Ctrl+L on focused task opens the label assigner popup', async ({ page }) => {
     await focusEl(page, `node-${IDS.TASK_A1}`)
     await page.keyboard.press('Control+l')
-    const assigner = page.locator('[data-testid="label-assigner"]')
-    await expect(assigner).toBeVisible()
+    await expect(page.locator('[data-testid="label-assigner"]')).toBeVisible()
   })
 })
 
@@ -119,10 +208,10 @@ test.describe('Navigation mode actions', () => {
 test.describe('Edit mode behaviour', () => {
   test('Enter in edit mode creates sibling task below', async ({ page }) => {
     await focusEl(page, `node-${IDS.TASK_A1}`)
-    await page.keyboard.press('Enter') // enter edit mode
+    await page.keyboard.press('Enter')
     expect(await isContentEditableFocused(page)).toBe(true)
     const countBefore = await page.locator(`[data-testid^="node-"]:not([data-testid^="node-handle-"])`).count()
-    await page.keyboard.press('Enter') // create sibling
+    await page.keyboard.press('Enter')
     await page.waitForTimeout(100)
     const countAfter = await page.locator(`[data-testid^="node-"]:not([data-testid^="node-handle-"])`).count()
     expect(countAfter).toBe(countBefore + 1)
@@ -130,23 +219,20 @@ test.describe('Edit mode behaviour', () => {
 
   test('Tab in edit mode indents task (regression guard)', async ({ page }) => {
     await focusEl(page, `node-${IDS.TASK_A2}`)
-    await page.keyboard.press('Enter') // enter edit mode
-    // TASK_A2 starts at depth 0; Tab makes it a child of TASK_A1
+    await page.keyboard.press('Enter')
     await page.keyboard.press('Tab')
     await page.waitForTimeout(100)
-    // TASK_A2 should now be indented (child of TASK_A1) — check it's nested inside TASK_A1
     const nested = page.locator(`[data-testid="node-${IDS.TASK_A1}"] [data-testid="node-${IDS.TASK_A2}"]`)
     await expect(nested).toBeVisible()
   })
 
   test('Escape in edit mode blurs contentEditable and focuses node wrapper', async ({ page }) => {
     await focusEl(page, `node-${IDS.TASK_A1}`)
-    await page.keyboard.press('Enter') // enter edit mode
+    await page.keyboard.press('Enter')
     expect(await isContentEditableFocused(page)).toBe(true)
     await page.keyboard.press('Escape')
     expect(await isContentEditableFocused(page)).toBe(false)
-    const focused = await focusedTestId(page)
-    expect(focused).toBe(`node-${IDS.TASK_A1}`)
+    expect(await focusedTestId(page)).toBe(`node-${IDS.TASK_A1}`)
   })
 })
 
@@ -173,17 +259,14 @@ test.describe('Ctrl+Shift+N — new card', () => {
 
 test.describe('Keyboard shortcuts help', () => {
   test('? button is visible in header', async ({ page }) => {
-    const btn = page.locator('[data-testid="keyboard-help-btn"]')
-    await expect(btn).toBeVisible()
+    await expect(page.locator('[data-testid="keyboard-help-btn"]')).toBeVisible()
   })
 
   test('clicking ? opens shortcut popover with at least 6 shortcuts', async ({ page }) => {
     await page.locator('[data-testid="keyboard-help-btn"]').click()
     const popover = page.locator('[data-testid="keyboard-help-popover"]')
     await expect(popover).toBeVisible()
-    const rows = popover.locator('tr, li, [data-testid^="shortcut-"]')
-    await expect(rows).toHaveCount.greaterThan ? null : null // flexible check
-    const count = await rows.count()
+    const count = await popover.locator('tr').count()
     expect(count).toBeGreaterThanOrEqual(6)
   })
 
