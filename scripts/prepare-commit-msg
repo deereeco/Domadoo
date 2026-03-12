@@ -1,0 +1,10 @@
+#!/bin/sh
+# Prepend app version to commit message (e.g. "v0.1.12: feat: ...")
+# Note: pre-commit runs first and bumps the version, so we read the already-bumped value.
+COMMIT_MSG_FILE=$1
+COMMIT_SOURCE=$2
+[ "$COMMIT_SOURCE" = "merge" ] && exit 0
+[ "$COMMIT_SOURCE" = "squash" ] && exit 0
+VERSION=$(node -p "require('./package.json').version" 2>/dev/null)
+[ -z "$VERSION" ] && exit 0
+sed -i "1s/^/v${VERSION}: /" "$COMMIT_MSG_FILE"

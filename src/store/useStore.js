@@ -17,6 +17,7 @@ const DEFAULT_STATE = {
   syncStatus: 'idle', // 'idle' | 'saving' | 'error'
   dragMode: false,
   nestTargetId: null,
+  nestZoneActive: false,
 }
 
 export const useStore = create((set, get) => ({
@@ -35,6 +36,7 @@ export const useStore = create((set, get) => ({
   // ── Nest Target ────────────────────────────────────────────────────────────
   setNestTarget(id) { set({ nestTargetId: id }) },
   clearNestTarget() { set({ nestTargetId: null }) },
+  setNestZoneActive(val) { set({ nestZoneActive: val }) },
 
   // ── Theme ──────────────────────────────────────────────────────────────────
   toggleTheme() {

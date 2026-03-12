@@ -26,6 +26,7 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
   const nodeRef = useRef(null)
 
   const nestTargetId = useStore(s => s.nestTargetId)
+  const nestZoneActive = useStore(s => s.nestZoneActive)
   const isNestTarget = nestTargetId === nodeId
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -53,7 +54,7 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
   const hasLinkedRelationship = hasTodaysCopy || isTodaysCopy
 
   const style = {
-    transform: CSS.Transform.toString(transform),
+    transform: (nestZoneActive && !isDragging) ? undefined : CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : vis.dimmed ? 0.45 : 1,
   }

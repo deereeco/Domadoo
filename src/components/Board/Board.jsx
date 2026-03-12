@@ -13,11 +13,25 @@ import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable'
 import { useStore } from '../../store/useStore.js'
 import RootCard from '../Card/RootCard.jsx'
 
+function zoneAwareCollision(args) {
+  const collisions = pointerWithin(args)
+  return collisions.map(collision => {
+    const droppable = args.droppables.get(collision.id)
+    if (droppable?.data?.current?.type !== 'node') return collision
+    const rect = droppable.rect.current
+    if (!rect || !args.pointerCoordinates) return collision
+    const rel = args.pointerCoordinates.y - rect.top
+    const zone = rel < rect.height / 3 ? 'top' : rel > (rect.height * 2) / 3 ? 'bottom' : 'middle'
+    return { ...collision, data: { ...collision.data, zone } }
+  })
+}
+
 export default function Board() {
-  const { rootOrder, nodes, addRootNode, moveNode, reorderRootCards, reorderChildren, dragMode, linkToTodaysTasks, todaysTasksRootId, setNestTarget, clearNestTarget } = useStore()
+  const { rootOrder, nodes, addRootNode, moveNode, reorderRootCards, reorderChildren, dragMode, linkToTodaysTasks, todaysTasksRootId, setNestTarget, clearNestTarget, setNestZoneActive } = useStore()
 
   const [activeDragType, setActiveDragType] = useState(null)
   const nestTimerRef = useRef(null)
+  const currentNestOverRef = useRef(null)
   const { setNodeRef: setBoardRef, isOver: isBoardOver } = useDroppable({
     id: 'board-background',
     data: { type: 'board' },
@@ -31,18 +45,32 @@ export default function Board() {
     setActiveDragType(active.data.current?.type ?? null)
   }, [])
 
-  const handleDragOver = useCallback(({ over }) => {
-    if (nestTimerRef.current) { clearTimeout(nestTimerRef.current); nestTimerRef.current = null }
-    clearNestTarget()
-    if (over?.data?.current?.type === 'node') {
-      nestTimerRef.current = setTimeout(() => setNestTarget(over.id), 400)
+  const handleDragOver = useCallback(({ over, collisions }) => {
+    const overCollision = collisions?.find(c => c.id === over?.id)
+    const zone = overCollision?.data?.zone
+
+    if (zone === 'middle') {
+      setNestZoneActive(true)
+      if (over.id !== currentNestOverRef.current) {
+        if (nestTimerRef.current) { clearTimeout(nestTimerRef.current); nestTimerRef.current = null }
+        clearNestTarget()
+        currentNestOverRef.current = over.id
+        nestTimerRef.current = setTimeout(() => setNestTarget(over.id), 400)
+      }
+    } else {
+      setNestZoneActive(false)
+      currentNestOverRef.current = null
+      if (nestTimerRef.current) { clearTimeout(nestTimerRef.current); nestTimerRef.current = null }
+      clearNestTarget()
     }
-  }, [clearNestTarget, setNestTarget])
+  }, [clearNestTarget, setNestTarget, setNestZoneActive])
 
   const handleDragEnd = useCallback(({ active, over }) => {
     if (nestTimerRef.current) { clearTimeout(nestTimerRef.current); nestTimerRef.current = null }
     const nestTargetId = useStore.getState().nestTargetId
     clearNestTarget()
+    setNestZoneActive(false)
+    currentNestOverRef.current = null
     setActiveDragType(null)
     if (!over || active.id === over.id) return
 
@@ -133,10 +161,10 @@ export default function Board() {
         return
       }
     }
-  }, [rootOrder, nodes, moveNode, reorderRootCards, reorderChildren, linkToTodaysTasks, todaysTasksRootId])
+  }, [rootOrder, nodes, moveNode, reorderRootCards, reorderChildren, linkToTodaysTasks, todaysTasksRootId, clearNestTarget, setNestZoneActive])
 
   return (
-    <DndContext sensors={sensors} collisionDetection={pointerWithin} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
+    <DndContext sensors={sensors} collisionDetection={zoneAwareCollision} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
       <div className="max-w-screen-xl mx-auto px-4 py-6">
         <SortableContext items={rootOrder} strategy={rectSortingStrategy}>
           <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4">
