@@ -43,6 +43,7 @@ export default function RootCard({ nodeId }) {
       ref={setNodeRef}
       style={style}
       data-nodeid={nodeId}
+      data-testid={`card-${nodeId}`}
       className={`break-inside-avoid mb-4 rounded-2xl border transition-shadow ${
         isToday
           ? 'border-amber-300 dark:border-amber-600 bg-amber-50/60 dark:bg-amber-950/30'
@@ -66,7 +67,7 @@ export default function RootCard({ nodeId }) {
             className="flex-1 text-sm font-semibold text-zinc-700 dark:text-zinc-100"
           />
           {/* Drag handle — touch-none scoped here so pinch zoom works on card title area */}
-          <span {...listeners} className="flex-shrink-0 text-zinc-300 dark:text-zinc-600 touch-none" aria-hidden="true">
+          <span {...listeners} data-testid={`card-handle-${nodeId}`} className="flex-shrink-0 text-zinc-300 dark:text-zinc-600 touch-none" style={{ pointerEvents: 'auto' }} aria-hidden="true">
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
               <circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/>
               <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
@@ -109,6 +110,7 @@ export default function RootCard({ nodeId }) {
       {/* Add item button */}
       <div className={`px-4 pb-3 ${dragMode ? 'pointer-events-none' : ''}`}>
         <button
+          data-testid={`add-item-${nodeId}`}
           onClick={() => addChildNode(nodeId)}
           className="flex items-center gap-1.5 text-xs text-zinc-400 dark:text-zinc-600 hover:text-zinc-600 dark:hover:text-zinc-400 transition-colors"
         >

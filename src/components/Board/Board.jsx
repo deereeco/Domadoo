@@ -1,7 +1,7 @@
 import { useCallback, useState, useRef, useEffect } from 'react'
 import {
   DndContext,
-  DragOverlay,
+  MeasuringStrategy,
   PointerSensor,
   pointerWithin,
   useSensor,
@@ -13,17 +13,22 @@ import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable'
 import { useStore } from '../../store/useStore.js'
 import RootCard from '../Card/RootCard.jsx'
 
-function zoneAwareCollision(args) {
-  const collisions = pointerWithin(args)
-  return collisions.map(collision => {
-    const droppable = args.droppableContainers.find(d => d.id === collision.id)
-    if (droppable?.data?.current?.type !== 'node') return collision
-    const rect = args.droppableRects.get(collision.id)
-    if (!rect || !args.pointerCoordinates) return collision
-    const rel = args.pointerCoordinates.y - rect.top
-    const zone = rel < rect.height / 3 ? 'top' : rel > (rect.height * 2) / 3 ? 'bottom' : 'middle'
-    return { ...collision, data: { ...collision.data, zone } }
-  })
+// Must be a separate component so useDroppable runs inside DndContext's tree
+function BoardDropZone({ activeDragType }) {
+  const { setNodeRef, isOver } = useDroppable({ id: 'board-background', data: { type: 'board' } })
+  return (
+    <div
+      ref={setNodeRef}
+      data-testid="board-drop-zone"
+      className={`mt-4 rounded-2xl border-2 border-dashed transition-colors ${
+        activeDragType === 'node'
+          ? `flex items-center justify-center h-16 ${isOver ? 'border-indigo-400 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-500' : 'border-zinc-300 dark:border-zinc-700 text-zinc-400 dark:text-zinc-600'}`
+          : 'h-px border-transparent'
+      }`}
+    >
+      {activeDragType === 'node' && <span className="text-sm">Drop here to create a new card</span>}
+    </div>
+  )
 }
 
 export default function Board() {
@@ -32,6 +37,50 @@ export default function Board() {
   const [activeDragType, setActiveDragType] = useState(null)
   const nestTimerRef = useRef(null)
   const currentNestOverRef = useRef(null)
+  const nestZoneActiveRef = useRef(false)
+
+  // Collision detection runs on every pointermove — ideal place to track zone changes.
+  // onDragOver only fires when `over` changes, which misses zone transitions within the same target.
+  const collisionDetection = useCallback((args) => {
+    const collisions = pointerWithin(args)
+    const mapped = collisions.map(collision => {
+      const droppable = args.droppableContainers.find(d => d.id === collision.id)
+      if (droppable?.data?.current?.type !== 'node') return collision
+      const rect = args.droppableRects.get(collision.id)
+      if (!rect || !args.pointerCoordinates) return collision
+      const rel = args.pointerCoordinates.y - rect.top
+      const zone = rel < rect.height / 3 ? 'top' : rel > (rect.height * 2) / 3 ? 'bottom' : 'middle'
+      return { ...collision, data: { ...collision.data, zone } }
+    })
+
+    // Find the primary node collision, excluding the dragged item itself
+    const primaryNode = mapped.find(c => {
+      if (c.id === args.active?.id) return false
+      return args.droppableContainers.find(d => d.id === c.id)?.data?.current?.type === 'node'
+    })
+
+    const zone = primaryNode?.data?.zone
+    const overId = primaryNode?.id ?? null
+
+    if (zone === 'middle' && overId !== null) {
+      if (!nestZoneActiveRef.current) { nestZoneActiveRef.current = true; setNestZoneActive(true) }
+      if (overId !== currentNestOverRef.current) {
+        if (nestTimerRef.current) { clearTimeout(nestTimerRef.current); nestTimerRef.current = null }
+        clearNestTarget()
+        currentNestOverRef.current = overId
+        nestTimerRef.current = setTimeout(() => setNestTarget(overId), 400)
+      }
+    } else {
+      if (nestZoneActiveRef.current) { nestZoneActiveRef.current = false; setNestZoneActive(false) }
+      if (currentNestOverRef.current !== null) {
+        currentNestOverRef.current = null
+        if (nestTimerRef.current) { clearTimeout(nestTimerRef.current); nestTimerRef.current = null }
+        clearNestTarget()
+      }
+    }
+
+    return mapped
+  }, [clearNestTarget, setNestTarget, setNestZoneActive])
 
   // Zoom reset
   const [isZoomed, setIsZoomed] = useState(false)
@@ -66,11 +115,6 @@ export default function Board() {
     }
   }, [resetZoom])
 
-  const { setNodeRef: setBoardRef, isOver: isBoardOver } = useDroppable({
-    id: 'board-background',
-    data: { type: 'board' },
-  })
-
   const pointerSensor = useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   const doubleTapSensor = useSensor(DoubleTapSensor, { activationConstraint: { delay: 250, tolerance: 8 } })
   const sensors = useSensors(dragMode ? pointerSensor : doubleTapSensor)
@@ -79,30 +123,11 @@ export default function Board() {
     setActiveDragType(active.data.current?.type ?? null)
   }, [])
 
-  const handleDragOver = useCallback(({ over, collisions }) => {
-    const overCollision = collisions?.find(c => c.id === over?.id)
-    const zone = overCollision?.data?.zone
-
-    if (zone === 'middle') {
-      setNestZoneActive(true)
-      if (over.id !== currentNestOverRef.current) {
-        if (nestTimerRef.current) { clearTimeout(nestTimerRef.current); nestTimerRef.current = null }
-        clearNestTarget()
-        currentNestOverRef.current = over.id
-        nestTimerRef.current = setTimeout(() => setNestTarget(over.id), 400)
-      }
-    } else {
-      setNestZoneActive(false)
-      currentNestOverRef.current = null
-      if (nestTimerRef.current) { clearTimeout(nestTimerRef.current); nestTimerRef.current = null }
-      clearNestTarget()
-    }
-  }, [clearNestTarget, setNestTarget, setNestZoneActive])
-
   const handleDragEnd = useCallback(({ active, over }) => {
     if (nestTimerRef.current) { clearTimeout(nestTimerRef.current); nestTimerRef.current = null }
     const nestTargetId = useStore.getState().nestTargetId
     clearNestTarget()
+    nestZoneActiveRef.current = false
     setNestZoneActive(false)
     currentNestOverRef.current = null
     setActiveDragType(null)
@@ -198,7 +223,7 @@ export default function Board() {
   }, [rootOrder, nodes, moveNode, reorderRootCards, reorderChildren, linkToTodaysTasks, todaysTasksRootId, clearNestTarget, setNestZoneActive])
 
   return (
-    <DndContext sensors={sensors} collisionDetection={zoneAwareCollision} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
+    <DndContext sensors={sensors} collisionDetection={collisionDetection} onDragStart={handleDragStart} onDragEnd={handleDragEnd} measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}>
       {isZoomed && (
         <button
           onClick={resetZoom}
@@ -207,9 +232,9 @@ export default function Board() {
           Reset zoom
         </button>
       )}
-      <div onClick={handleBgTap} className="max-w-screen-xl mx-auto px-4 py-6">
+      <div data-testid="board" onClick={handleBgTap} className="max-w-screen-xl mx-auto px-4 py-6">
         <SortableContext items={rootOrder} strategy={rectSortingStrategy}>
-          <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4">
+          <div data-testid="card-list" className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4">
             {rootOrder.map(id => (
               <RootCard key={id} nodeId={id} />
             ))}
@@ -237,6 +262,7 @@ export default function Board() {
         {rootOrder.length > 0 && !activeDragType && (
           <div className="mt-4">
             <button
+              data-testid="add-card-btn"
               onClick={addRootNode}
               className="flex items-center gap-2 px-4 py-2 text-sm text-zinc-400 dark:text-zinc-600 hover:text-zinc-600 dark:hover:text-zinc-300 border border-dashed border-zinc-300 dark:border-zinc-700 rounded-xl hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors w-full justify-center"
             >
@@ -248,18 +274,7 @@ export default function Board() {
           </div>
         )}
 
-        {activeDragType === 'node' && (
-          <div
-            ref={setBoardRef}
-            className={`mt-4 flex items-center justify-center h-16 rounded-2xl border-2 border-dashed transition-colors ${
-              isBoardOver
-                ? 'border-indigo-400 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-500'
-                : 'border-zinc-300 dark:border-zinc-700 text-zinc-400 dark:text-zinc-600'
-            }`}
-          >
-            <span className="text-sm">Drop here to create a new card</span>
-          </div>
-        )}
+        <BoardDropZone activeDragType={activeDragType} />
       </div>
     </DndContext>
   )

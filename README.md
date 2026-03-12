@@ -10,17 +10,44 @@ A highly interactive, modern task-tracking board. Visually inspired by Google Ke
 
 - **Infinite nesting** — tasks can be nested to any depth
 - **Keyboard-first editing** — `Enter` creates a sibling, `Tab` indents, `Shift+Tab` outdents, `Backspace` deletes empty nodes
-- **Drag & drop** — reorder siblings, reparent between cards, extract a nested task to the board as its own card, or merge a card into another
 - **CHECKBOX / BULLET toggle** — switch any node between an actionable task and a reference note
-- **Labels** — create color-coded labels, assign them to any node, manage them globally
+- **Labels** — create color-coded labels, assign them to any node, manage them globally via the Labels button in the header
 - **Filter bar** — filter by label: grey out non-matching nodes (show mode) or hide them entirely (hide mode). Tree-aware — parents are kept visible when children match
 - **Collapsed summary dots** — when a node is collapsed, small color dots show the labels hiding inside
-- **Today's Tasks** — a special card for daily focus. Drag any task in to create a live-linked copy — completing it in either place marks both done
+- **Today's Tasks** — a special card for daily focus. Drag any task into it to create a live-linked copy — completing it in either place marks both done. Linked tasks are automatically tagged with a "Today" label
 - **Done Today view** — see everything you've completed today, with one-click undo
 - **Details Modal** — zoom into any task for focused reading and editing, with a breadcrumb trail showing its full ancestry
 - **Light / dark mode** — toggle in the top-right corner, persisted across sessions
-- **Google Drive sync** — data is stored in your own Google Drive App Data folder. Nothing is shared externally
-- **Local-first** — reads from localStorage instantly on load, syncs to Drive in the background
+- **Google Drive sync** — data is stored in your own Google Drive App Data folder, with sign-in persisted across page reloads. Nothing is shared externally
+- **Local-first** — reads from localStorage instantly on load, syncs to Drive in the background. Sync status ("Saving…" / "Sync error") is shown in the header
+
+---
+
+## Moving Things Around
+
+### Drag modes
+
+There are two drag activation modes, toggled by the **Drag** button in the header:
+
+| Mode | How to start a drag |
+|---|---|
+| **Drag mode off** (default, touch-friendly) | Double-tap an item, then hold and drag on the second tap |
+| **Drag mode on** | Click and drag immediately (standard desktop behaviour) |
+
+Use **Drag mode on** on desktop when you want fast rearranging. Leave it off on mobile so normal taps don't accidentally start a drag.
+
+### What you can drag
+
+**Cards** (the top-level containers):
+- Drag a card's header to reorder it on the board
+- Drop a card onto another card's body to merge it in as a nested task
+
+**Tasks** (items inside cards):
+- Drag a task onto another task within the same card to reorder it
+- Drag a task to a different card to reparent it there
+- Drag a task into the **Today's Tasks** card body to create a live-linked copy
+- Hover a dragged task over another task for ~400 ms — it highlights as a nest target; release to make it a child of that task (**hover-to-nest**)
+- Drop a dragged task on the **"Drop here to create a new card"** zone that appears at the bottom of the board to extract it as a brand-new standalone card
 
 ---
 

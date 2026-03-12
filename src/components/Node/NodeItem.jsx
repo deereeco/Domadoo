@@ -63,6 +63,7 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
     <div
       ref={(el) => { setNodeRef(el); nodeRef.current = el }}
       data-nodeid={nodeId}
+      data-testid={`node-${nodeId}`}
       style={{ ...style, paddingLeft: depth > 0 ? `${Math.min(depth * 16, 64)}px` : undefined }}
       className="group relative"
     >
@@ -73,6 +74,7 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
         {/* Drag handle — listeners scoped here so touch-none doesn't block pinch zoom on the rest of the row */}
         <span
           {...listeners}
+          data-testid={`node-handle-${nodeId}`}
           className={`flex-shrink-0 mt-1 text-zinc-400 touch-none ${dragMode ? 'opacity-40' : 'opacity-20 group-hover:opacity-60'}`}
           aria-hidden="true"
         >

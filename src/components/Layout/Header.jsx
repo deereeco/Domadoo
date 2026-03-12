@@ -59,6 +59,7 @@ export default function Header() {
           </button>
 
           <button
+            data-testid="drag-toggle"
             onClick={toggleDragMode}
             className={`px-3 py-1.5 text-xs rounded-lg font-medium transition-colors ${
               dragMode
