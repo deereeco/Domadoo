@@ -598,6 +598,26 @@ export const useStore = create((set, get) => ({
     set({ showHistory: val })
   },
 
+  updateHistoryTask(snapshotId, taskId, content) {
+    set(state => {
+      const idx = state.history.findIndex(s => s.id === snapshotId)
+      if (idx === -1) return {}
+      const snapshot = state.history[idx]
+
+      function patchTask(tasks) {
+        return tasks.map(t => {
+          if (t.id === taskId) return { ...t, content }
+          if (t.children?.length) return { ...t, children: patchTask(t.children) }
+          return t
+        })
+      }
+
+      const newHistory = [...state.history]
+      newHistory[idx] = { ...snapshot, tasks: patchTask(snapshot.tasks) }
+      return { history: newHistory }
+    })
+  },
+
   initCleanupDate(date) {
     set({ lastCleanupDate: date })
   },

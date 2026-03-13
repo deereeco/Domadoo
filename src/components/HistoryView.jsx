@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import { useStore } from '../store/useStore.js'
 
 const PRESETS = [
@@ -32,25 +32,48 @@ function formatDayHeader(dateStr) {
   })
 }
 
-function TaskTree({ tasks, depth = 0 }) {
+function EditableTask({ task, snapshotId, depth = 0 }) {
+  const { updateHistoryTask } = useStore()
+  const ref = useRef(null)
+
+  const handleBlur = () => {
+    const newContent = ref.current?.innerText?.trim() ?? ''
+    if (newContent !== task.content) {
+      updateHistoryTask(snapshotId, task.id, newContent)
+    }
+  }
+
+  return (
+    <li>
+      <div className="flex items-start gap-2 group">
+        <div className="w-3.5 h-3.5 mt-0.5 rounded border-2 border-emerald-500 bg-emerald-500 flex items-center justify-center flex-shrink-0">
+          <svg className="w-2 h-2 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+          </svg>
+        </div>
+        <div
+          ref={ref}
+          contentEditable
+          suppressContentEditableWarning
+          onBlur={handleBlur}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); ref.current?.blur() } }}
+          className="text-sm text-zinc-500 dark:text-zinc-400 line-through flex-1 outline-none rounded px-0.5 -mx-0.5 focus:bg-zinc-100 dark:focus:bg-zinc-800 cursor-text break-words min-w-0"
+        >
+          {task.content || ''}
+        </div>
+      </div>
+      {task.children?.length > 0 && (
+        <TaskTree tasks={task.children} snapshotId={snapshotId} depth={depth + 1} />
+      )}
+    </li>
+  )
+}
+
+function TaskTree({ tasks, snapshotId, depth = 0 }) {
   return (
     <ul className={depth === 0 ? 'space-y-1' : 'mt-1 space-y-1 ml-4'}>
       {tasks.map(task => (
-        <li key={task.id}>
-          <div className="flex items-start gap-2">
-            <div className="w-3.5 h-3.5 mt-0.5 rounded border-2 border-emerald-500 bg-emerald-500 flex items-center justify-center flex-shrink-0">
-              <svg className="w-2 h-2 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <span className="text-sm text-zinc-500 dark:text-zinc-400 line-through flex-1">
-              {task.content || 'Untitled'}
-            </span>
-          </div>
-          {task.children && task.children.length > 0 && (
-            <TaskTree tasks={task.children} depth={depth + 1} />
-          )}
-        </li>
+        <EditableTask key={task.id} task={task} snapshotId={snapshotId} depth={depth} />
       ))}
     </ul>
   )
@@ -153,7 +176,7 @@ export default function HistoryView() {
               {snapshot.tasks.length === 0 ? (
                 <p className="text-xs text-zinc-400 dark:text-zinc-600 ml-1">No completed tasks.</p>
               ) : (
-                <TaskTree tasks={snapshot.tasks} />
+                <TaskTree tasks={snapshot.tasks} snapshotId={snapshot.id} />
               )}
             </div>
           ))}
