@@ -6,7 +6,7 @@ import { signOut } from '../../services/googleAuth.js'
 import { version } from '../../../package.json'
 
 export default function Header() {
-  const { user, setShowDoneToday, showDoneToday, setShowLabelManager, syncStatus, addTodaysTasksCard, todaysTasksRootId, signOut: storeSignOut, dragMode, toggleDragMode, setShowHistory, showHistory, seedDemoTodaysTasks, initCleanupDate, runDailyCleanup, nodes } = useStore()
+  const { user, setShowDoneToday, showDoneToday, setShowLabelManager, syncStatus, addTodaysTasksCard, todaysTasksRootId, signOut: storeSignOut, dragMode, toggleDragMode, setShowHistory, showHistory, seedDemoTodaysTasks, initCleanupDate, runDailyCleanup, clearDemoData, nodes } = useStore()
   const [showHelp, setShowHelp] = useState(false)
   const [showDemo, setShowDemo] = useState(false)
 
@@ -116,6 +116,14 @@ export default function Header() {
                 >
                   Next day →
                   <span className="block text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">Trigger daily cleanup</span>
+                </button>
+                <div className="my-1 border-t border-zinc-100 dark:border-zinc-700" />
+                <button
+                  onClick={() => { clearDemoData(); setShowDemo(false) }}
+                  className="w-full text-left px-3 py-2 text-sm text-red-500 dark:text-red-400 hover:bg-zinc-50 dark:hover:bg-zinc-700"
+                >
+                  Clear demo data
+                  <span className="block text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">Remove seeded demo tasks</span>
                 </button>
               </div>
             )}

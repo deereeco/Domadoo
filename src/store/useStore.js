@@ -890,6 +890,57 @@ export const useStore = create((set, get) => ({
     })
   },
 
+  clearDemoData() {
+    const DEMO_CARD_ID = 'demo-card-seed-0000-0000-000000000001'
+    set(state => {
+      const newNodes = { ...state.nodes }
+      // Collect demo card and all its descendants + _today copies
+      const toDelete = new Set()
+      const collect = (nid) => {
+        const n = newNodes[nid]
+        if (!n) return
+        toDelete.add(nid)
+        n.childrenIds.forEach(collect)
+        n.linkedNodeIds.forEach(lid => { if (newNodes[lid]) collect(lid) })
+      }
+      if (newNodes[DEMO_CARD_ID]) collect(DEMO_CARD_ID)
+
+      toDelete.forEach(id => delete newNodes[id])
+
+      // Clean up linkedNodeIds on surviving nodes
+      Object.keys(newNodes).forEach(nid => {
+        const n = newNodes[nid]
+        if (!n.linkedNodeIds?.length) return
+        const filtered = n.linkedNodeIds.filter(lid => !toDelete.has(lid))
+        if (filtered.length !== n.linkedNodeIds.length) {
+          let { labelIds } = n
+          if (!filtered.some(lid => newNodes[lid]?.isTodaysTask)) {
+            labelIds = labelIds.filter(lid => lid !== state.todaysTasksLabelId)
+          }
+          newNodes[nid] = { ...n, linkedNodeIds: filtered, labelIds }
+        }
+      })
+
+      // Remove demo tasks from Today's Tasks children
+      const todaysId = state.todaysTasksRootId
+      if (todaysId && newNodes[todaysId]) {
+        newNodes[todaysId] = {
+          ...newNodes[todaysId],
+          childrenIds: newNodes[todaysId].childrenIds.filter(id => !toDelete.has(id)),
+        }
+      }
+
+      // Remove history snapshots that only contain demo content
+      const demoContents = new Set(['Reviewed PR #42', 'Updated docs', 'Write unit tests', 'Fix login bug'])
+      const newHistory = state.history.filter(snapshot =>
+        !snapshot.tasks.every(t => demoContents.has(t.content))
+      )
+
+      const newRootOrder = state.rootOrder.filter(id => !toDelete.has(id))
+      return { nodes: newNodes, rootOrder: newRootOrder, history: newHistory }
+    })
+  },
+
   seedDemoTodaysTasks() {
     // Ensure Today's Tasks card exists
     if (!get().todaysTasksRootId) get().addTodaysTasksCard()
