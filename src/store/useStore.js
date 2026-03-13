@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { createNode, createLabel } from '../types/index.js'
+import { createNode, createLabel, createHistorySnapshot } from '../types/index.js'
 import { saveToCache, loadFromCache, saveUser, loadUser, clearUser } from '../services/localCache.js'
 
 const SYSTEM_TODAY_LABEL_ID = 'system-today-label-0000-000000000000'
@@ -21,6 +21,11 @@ const DEFAULT_STATE = {
   dragMode: false,
   nestTargetId: null,
   nestZoneActive: false,
+  // Daily cleanup & history
+  history: [],           // DaySnapshot[]  (persisted)
+  lastCleanupDate: null, // 'YYYY-MM-DD'   (persisted)
+  pendingCleanupTasks: null, // [{id, content, originalId, resolved}] | null (ephemeral)
+  showHistory: false,    // bool (ephemeral)
 }
 
 export const useStore = create((set, get) => ({
@@ -586,6 +591,372 @@ export const useStore = create((set, get) => ({
 
   setSyncStatus(status) {
     set({ syncStatus: status })
+  },
+
+  // ── Daily Cleanup & History ─────────────────────────────────────────────────
+  setShowHistory(val) {
+    set({ showHistory: val })
+  },
+
+  initCleanupDate(date) {
+    set({ lastCleanupDate: date })
+  },
+
+  // Serialize a _today node's tree into a plain object snapshot (uses original IDs)
+  _serializeTaskTree(nodeId, nodes) {
+    const node = nodes[nodeId]
+    if (!node) return null
+    const originalId = node.isTodaysTask ? (node.linkedNodeIds[0] ?? nodeId) : nodeId
+    const original = nodes[originalId] ?? node
+    const children = node.childrenIds
+      .map(cid => get()._serializeTaskTree(cid, nodes))
+      .filter(Boolean)
+    return {
+      id: originalId,
+      content: original.content,
+      status: original.status,
+      type: original.type,
+      completedAt: original.completedAt,
+      children,
+    }
+  },
+
+  runDailyCleanup() {
+    set(state => {
+      const { nodes, todaysTasksRootId, lastCleanupDate, history } = state
+      if (!todaysTasksRootId) return {}
+      const todaysCard = nodes[todaysTasksRootId]
+      if (!todaysCard || todaysCard.childrenIds.length === 0) {
+        return { lastCleanupDate: new Date().toISOString().split('T')[0] }
+      }
+
+      const yesterdayDate = lastCleanupDate // the date we're archiving
+
+      const completed = todaysCard.childrenIds.filter(id => nodes[id]?.status === 'COMPLETED')
+      const incomplete = todaysCard.childrenIds.filter(id => nodes[id] && nodes[id].status !== 'COMPLETED')
+
+      let newNodes = { ...nodes }
+      let newHistory = [...history]
+      let newRootOrder = [...state.rootOrder]
+
+      // Archive completed tasks into a snapshot
+      if (completed.length > 0) {
+        const snapshotTasks = completed.map(id => get()._serializeTaskTree(id, nodes)).filter(Boolean)
+
+        // Merge with existing snapshot for this date or create new
+        const existingIdx = newHistory.findIndex(s => s.date === yesterdayDate)
+        if (existingIdx >= 0) {
+          newHistory[existingIdx] = {
+            ...newHistory[existingIdx],
+            tasks: [...newHistory[existingIdx].tasks, ...snapshotTasks],
+          }
+        } else {
+          newHistory.push(createHistorySnapshot(yesterdayDate, snapshotTasks))
+        }
+
+        // Unlink completed _today copies
+        completed.forEach(todayId => {
+          const todayNode = newNodes[todayId]
+          if (!todayNode) return
+
+          // Collect all _today descendants
+          const toDelete = new Set()
+          const collect = (nid) => {
+            const n = newNodes[nid]
+            if (!n) return
+            toDelete.add(nid)
+            n.childrenIds.forEach(collect)
+          }
+          collect(todayId)
+
+          // Remove from Today's card children
+          const todaysCardNode = newNodes[todaysTasksRootId]
+          if (todaysCardNode) {
+            newNodes[todaysTasksRootId] = {
+              ...todaysCardNode,
+              childrenIds: todaysCardNode.childrenIds.filter(c => c !== todayId),
+            }
+          }
+
+          // Clean up originals' linkedNodeIds and Today label
+          toDelete.forEach(tid => {
+            const todayCopy = newNodes[tid]
+            if (!todayCopy) return
+            todayCopy.linkedNodeIds.forEach(originalId => {
+              const original = newNodes[originalId]
+              if (!original) return
+              const filteredLinks = original.linkedNodeIds.filter(lid => !toDelete.has(lid))
+              let { labelIds } = original
+              if (tid === todayId && state.todaysTasksLabelId) {
+                labelIds = labelIds.filter(lid => lid !== state.todaysTasksLabelId)
+              }
+              newNodes[originalId] = { ...original, linkedNodeIds: filteredLinks, labelIds }
+            })
+            delete newNodes[tid]
+          })
+        })
+      }
+
+      // Set up pending incomplete tasks (modal will handle these)
+      let pendingCleanupTasks = null
+      let newLastCleanupDate = state.lastCleanupDate
+      if (incomplete.length > 0) {
+        pendingCleanupTasks = incomplete.map(id => ({
+          id,
+          content: nodes[id]?.content ?? '',
+          originalId: nodes[id]?.linkedNodeIds[0] ?? null,
+          resolved: null, // 'today' | 'complete' | 'pushback'
+        }))
+      } else {
+        newLastCleanupDate = new Date().toISOString().split('T')[0]
+      }
+
+      return {
+        nodes: newNodes,
+        rootOrder: newRootOrder,
+        history: newHistory,
+        lastCleanupDate: newLastCleanupDate,
+        pendingCleanupTasks,
+      }
+    })
+  },
+
+  resolveCleanupTask(taskId, action) {
+    set(state => {
+      const pending = state.pendingCleanupTasks
+      if (!pending) return {}
+      return {
+        pendingCleanupTasks: pending.map(t =>
+          t.id === taskId ? { ...t, resolved: action } : t
+        ),
+      }
+    })
+  },
+
+  finalizeDayCleanup() {
+    set(state => {
+      const { pendingCleanupTasks, nodes, todaysTasksRootId, lastCleanupDate, history } = state
+      if (!pendingCleanupTasks) return {}
+
+      let newNodes = { ...nodes }
+      let newHistory = [...history]
+      const today = new Date().toISOString().split('T')[0]
+      const yesterdayDate = lastCleanupDate
+
+      const toArchive = []
+
+      pendingCleanupTasks.forEach(task => {
+        const { id: todayId, resolved } = task
+        const todayNode = newNodes[todayId]
+        if (!todayNode) return
+
+        if (resolved === 'complete') {
+          // Mark completed and collect for archive
+          const originalId = todayNode.linkedNodeIds[0]
+          const original = newNodes[originalId]
+          const now = new Date().toISOString()
+          if (original) {
+            newNodes[originalId] = { ...original, status: 'COMPLETED', completedAt: now }
+          }
+          newNodes[todayId] = { ...todayNode, status: 'COMPLETED', completedAt: now }
+          toArchive.push(todayId)
+
+          // Unlink from Today's card
+          const todaysCardNode = newNodes[todaysTasksRootId]
+          if (todaysCardNode) {
+            newNodes[todaysTasksRootId] = {
+              ...todaysCardNode,
+              childrenIds: todaysCardNode.childrenIds.filter(c => c !== todayId),
+            }
+          }
+
+          // Clean up _today descendants
+          const toDelete = new Set()
+          const collect = (nid) => {
+            const n = newNodes[nid]
+            if (!n) return
+            toDelete.add(nid)
+            n.childrenIds.forEach(collect)
+          }
+          collect(todayId)
+
+          toDelete.forEach(tid => {
+            const todayCopy = newNodes[tid]
+            if (!todayCopy) return
+            todayCopy.linkedNodeIds.forEach(oid => {
+              const orig = newNodes[oid]
+              if (!orig) return
+              const filteredLinks = orig.linkedNodeIds.filter(lid => !toDelete.has(lid))
+              let { labelIds } = orig
+              if (tid === todayId && state.todaysTasksLabelId) {
+                labelIds = labelIds.filter(lid => lid !== state.todaysTasksLabelId)
+              }
+              newNodes[oid] = { ...orig, linkedNodeIds: filteredLinks, labelIds }
+            })
+            delete newNodes[tid]
+          })
+        } else if (resolved === 'pushback') {
+          // Remove _today copy, preserve original
+          const toDelete = new Set()
+          const collect = (nid) => {
+            const n = newNodes[nid]
+            if (!n) return
+            toDelete.add(nid)
+            n.childrenIds.forEach(collect)
+          }
+          collect(todayId)
+
+          const todaysCardNode = newNodes[todaysTasksRootId]
+          if (todaysCardNode) {
+            newNodes[todaysTasksRootId] = {
+              ...todaysCardNode,
+              childrenIds: todaysCardNode.childrenIds.filter(c => c !== todayId),
+            }
+          }
+
+          toDelete.forEach(tid => {
+            const todayCopy = newNodes[tid]
+            if (!todayCopy) return
+            todayCopy.linkedNodeIds.forEach(oid => {
+              const orig = newNodes[oid]
+              if (!orig) return
+              const filteredLinks = orig.linkedNodeIds.filter(lid => !toDelete.has(lid))
+              let { labelIds } = orig
+              if (tid === todayId && state.todaysTasksLabelId) {
+                labelIds = labelIds.filter(lid => lid !== state.todaysTasksLabelId)
+              }
+              newNodes[oid] = { ...orig, linkedNodeIds: filteredLinks, labelIds }
+            })
+            delete newNodes[tid]
+          })
+        }
+        // 'today': leave as-is, stays in Today's Tasks
+      })
+
+      // Archive 'complete'-resolved tasks
+      if (toArchive.length > 0) {
+        const snapshotTasks = toArchive.map(id => {
+          const n = newNodes[id] ?? nodes[id]
+          if (!n) return null
+          const origId = n.linkedNodeIds[0] ?? id
+          const orig = newNodes[origId] ?? nodes[origId] ?? n
+          return {
+            id: origId,
+            content: orig.content,
+            status: 'COMPLETED',
+            type: orig.type,
+            completedAt: orig.completedAt,
+            children: [],
+          }
+        }).filter(Boolean)
+
+        const existingIdx = newHistory.findIndex(s => s.date === yesterdayDate)
+        if (existingIdx >= 0) {
+          newHistory[existingIdx] = {
+            ...newHistory[existingIdx],
+            tasks: [...newHistory[existingIdx].tasks, ...snapshotTasks],
+          }
+        } else {
+          newHistory.push(createHistorySnapshot(yesterdayDate, snapshotTasks))
+        }
+      }
+
+      return {
+        nodes: newNodes,
+        history: newHistory,
+        lastCleanupDate: today,
+        pendingCleanupTasks: null,
+      }
+    })
+  },
+
+  seedDemoTodaysTasks() {
+    // Ensure Today's Tasks card exists
+    if (!get().todaysTasksRootId) get().addTodaysTasksCard()
+    const todaysId = get().todaysTasksRootId
+    const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1)
+    const pastTime = yesterday.toISOString()
+
+    const demoSpec = [
+      { content: 'Reviewed PR #42', status: 'COMPLETED', completedAt: pastTime },
+      { content: 'Updated docs', status: 'COMPLETED', completedAt: pastTime },
+      { content: 'Write unit tests', status: 'OPEN', completedAt: null },
+      { content: 'Fix login bug', status: 'OPEN', completedAt: null },
+    ]
+
+    // Pre-generate IDs outside set()
+    const demoCardId = 'demo-card-seed-0000-0000-000000000001'
+    const entries = demoSpec.map((spec, i) => {
+      const origId = `demo-task-orig-000${i}-000000000001`
+      const todayId = origId + '_today'
+      return { ...spec, origId, todayId }
+    })
+
+    set(state => {
+      const newNodes = { ...state.nodes }
+      const todaysCard = newNodes[todaysId]
+      if (!todaysCard) return {}
+
+      const newChildIds = [...todaysCard.childrenIds]
+      const origIds = []
+
+      entries.forEach(({ content, status, completedAt, origId, todayId }) => {
+        origIds.push(origId)
+        newNodes[origId] = {
+          id: origId,
+          parentId: demoCardId,
+          childrenIds: [],
+          type: 'CHECKBOX',
+          status,
+          content,
+          uiState: { isExpanded: true, isFocusMode: false },
+          labelIds: [state.todaysTasksLabelId],
+          linkedNodeIds: [todayId],
+          isTodaysTask: false,
+          createdAt: pastTime,
+          completedAt,
+        }
+        newNodes[todayId] = {
+          id: todayId,
+          parentId: todaysId,
+          childrenIds: [],
+          type: 'CHECKBOX',
+          status,
+          content,
+          uiState: { isExpanded: true, isFocusMode: false },
+          labelIds: [],
+          linkedNodeIds: [origId],
+          isTodaysTask: true,
+          createdAt: pastTime,
+          completedAt,
+        }
+        newChildIds.push(todayId)
+      })
+
+      // Demo card to hold the originals
+      newNodes[demoCardId] = {
+        id: demoCardId,
+        parentId: null,
+        childrenIds: origIds,
+        type: 'CHECKBOX',
+        status: 'OPEN',
+        content: 'Demo Tasks',
+        uiState: { isExpanded: true, isFocusMode: false },
+        labelIds: [],
+        linkedNodeIds: [],
+        isTodaysTask: false,
+        createdAt: pastTime,
+        completedAt: null,
+      }
+
+      newNodes[todaysId] = { ...todaysCard, childrenIds: newChildIds }
+
+      const newRootOrder = state.rootOrder.includes(demoCardId)
+        ? state.rootOrder
+        : [demoCardId, ...state.rootOrder]
+
+      return { nodes: newNodes, rootOrder: newRootOrder }
+    })
   },
 }))
 

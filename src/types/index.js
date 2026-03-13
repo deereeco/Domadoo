@@ -17,6 +17,10 @@ export function createNode({ parentId = null, type = 'CHECKBOX', content = '' } 
   }
 }
 
+export function createHistorySnapshot(date, tasks) {
+  return { id: uuidv4(), date, tasks }
+}
+
 export function createLabel({ name = 'New Label', color = '#6366f1', isSystem = false } = {}) {
   return {
     id: uuidv4(),

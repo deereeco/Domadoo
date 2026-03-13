@@ -3,7 +3,10 @@ const USER_KEY = 'domadoo_user'
 
 export function saveToCache(state) {
   try {
-    const { user, syncStatus, detailsModalNodeId, showDoneToday, showLabelManager, ...persist } = state
+    // eslint-disable-next-line no-unused-vars
+    const { user, syncStatus, detailsModalNodeId, showDoneToday, showLabelManager,
+            pendingCleanupTasks, showHistory,
+            nestTargetId, nestZoneActive, ...persist } = state
     localStorage.setItem(KEY, JSON.stringify(persist))
   } catch (e) {
     console.warn('Failed to save to localStorage', e)
