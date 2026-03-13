@@ -26,6 +26,9 @@ const DEFAULT_STATE = {
   lastCleanupDate: null, // 'YYYY-MM-DD'   (persisted)
   pendingCleanupTasks: null, // [{id, content, originalId, resolved}] | null (ephemeral)
   showHistory: false,    // bool (ephemeral)
+  // Demo mode
+  isDemoMode: false,
+  savedRealData: null,   // { nodes, rootOrder, history, lastCleanupDate, todaysTasksRootId } | null
 }
 
 export const useStore = create((set, get) => ({
@@ -939,6 +942,39 @@ export const useStore = create((set, get) => ({
 
       const newRootOrder = state.rootOrder.filter(id => !toDelete.has(id))
       return { nodes: newNodes, rootOrder: newRootOrder, history: newHistory }
+    })
+  },
+
+  enterDemoMode() {
+    if (get().isDemoMode) return
+    const { nodes, rootOrder, history, lastCleanupDate, todaysTasksRootId } = get()
+    set({
+      savedRealData: { nodes, rootOrder, history, lastCleanupDate, todaysTasksRootId },
+      nodes: {},
+      rootOrder: [],
+      history: [],
+      lastCleanupDate: null,
+      todaysTasksRootId: null,
+      isDemoMode: true,
+    })
+    get().seedDemoTodaysTasks()
+  },
+
+  exitDemoMode() {
+    const { savedRealData } = get()
+    if (!savedRealData) {
+      get().clearDemoData()
+      set({ isDemoMode: false, savedRealData: null })
+      return
+    }
+    set({
+      nodes: savedRealData.nodes,
+      rootOrder: savedRealData.rootOrder,
+      history: savedRealData.history,
+      lastCleanupDate: savedRealData.lastCleanupDate,
+      todaysTasksRootId: savedRealData.todaysTasksRootId ?? null,
+      isDemoMode: false,
+      savedRealData: null,
     })
   },
 

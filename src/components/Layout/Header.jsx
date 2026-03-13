@@ -1,25 +1,15 @@
 import { useState } from 'react'
 import ThemeToggle from './ThemeToggle.jsx'
 import KeyboardShortcutsHelp from '../UI/KeyboardShortcutsHelp.jsx'
+import DemoModal from '../DemoModal.jsx'
 import { useStore } from '../../store/useStore.js'
 import { signOut } from '../../services/googleAuth.js'
 import { version } from '../../../package.json'
 
 export default function Header() {
-  const { user, setShowDoneToday, showDoneToday, setShowLabelManager, syncStatus, addTodaysTasksCard, todaysTasksRootId, signOut: storeSignOut, dragMode, toggleDragMode, setShowHistory, showHistory, seedDemoTodaysTasks, initCleanupDate, runDailyCleanup, clearDemoData, nodes } = useStore()
+  const { user, setShowDoneToday, showDoneToday, setShowLabelManager, syncStatus, addTodaysTasksCard, todaysTasksRootId, signOut: storeSignOut, dragMode, toggleDragMode, setShowHistory, showHistory, isDemoMode } = useStore()
   const [showHelp, setShowHelp] = useState(false)
-  const [showDemo, setShowDemo] = useState(false)
-
-  const handleDemoNextDay = () => {
-    const tid = todaysTasksRootId
-    if (!tid || !nodes[tid] || nodes[tid].childrenIds.length === 0) {
-      seedDemoTodaysTasks()
-    }
-    const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1)
-    initCleanupDate(yesterday.toISOString().split('T')[0])
-    runDailyCleanup()
-    setShowDemo(false)
-  }
+  const [showDemoModal, setShowDemoModal] = useState(false)
 
   const handleSignOut = () => {
     signOut()
@@ -98,36 +88,19 @@ export default function Header() {
             Drag
           </button>
 
-          <div className="relative">
-            <button
-              data-testid="demo-btn"
-              onClick={() => setShowDemo(v => !v)}
-              className="px-2 py-1.5 text-xs rounded-lg font-medium text-zinc-400 dark:text-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-              title="Demo scenarios"
-            >
-              Demo
-            </button>
-            {showDemo && (
-              <div className="absolute right-0 top-full mt-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-lg py-1 min-w-[180px] z-50">
-                <p className="px-3 py-1 text-[10px] text-zinc-400 dark:text-zinc-500 uppercase tracking-wide font-medium">Simulate</p>
-                <button
-                  onClick={handleDemoNextDay}
-                  className="w-full text-left px-3 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-700"
-                >
-                  Next day →
-                  <span className="block text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">Trigger daily cleanup</span>
-                </button>
-                <div className="my-1 border-t border-zinc-100 dark:border-zinc-700" />
-                <button
-                  onClick={() => { clearDemoData(); setShowDemo(false) }}
-                  className="w-full text-left px-3 py-2 text-sm text-red-500 dark:text-red-400 hover:bg-zinc-50 dark:hover:bg-zinc-700"
-                >
-                  Clear demo data
-                  <span className="block text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">Remove seeded demo tasks</span>
-                </button>
-              </div>
-            )}
-          </div>
+          <button
+            data-testid="demo-btn"
+            onClick={() => setShowDemoModal(true)}
+            className={`px-2 py-1.5 text-xs rounded-lg font-medium transition-colors ${
+              isDemoMode
+                ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400'
+                : 'text-zinc-400 dark:text-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+            }`}
+            title={isDemoMode ? 'Demo mode active' : 'Demo scenarios'}
+          >
+            {isDemoMode ? 'Demo ●' : 'Demo'}
+          </button>
+          {showDemoModal && <DemoModal onClose={() => setShowDemoModal(false)} />}
 
           <div className="relative">
             <button

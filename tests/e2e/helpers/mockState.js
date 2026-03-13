@@ -173,3 +173,36 @@ export async function setupFreshState(page) {
   await page.route('https://accounts.google.com/**', route => route.abort())
   await injectState(page, MOCK_STATE)
 }
+
+/**
+ * Sets up state already in demo mode (isDemoMode: true), with savedRealData pointing
+ * to a simple two-card board. The visible state shows demo's Today's Tasks card.
+ */
+export async function setupDemoModeState(page) {
+  await page.route('https://apis.google.com/**', route => route.abort())
+  await page.route('https://accounts.google.com/**', route => route.abort())
+  const DEMO_CARD_ID = 'demo-card-seed-0000-0000-000000000001'
+  const demoState = {
+    ...MOCK_STATE,
+    isDemoMode: true,
+    savedRealData: {
+      nodes: MOCK_STATE.nodes,
+      rootOrder: MOCK_STATE.rootOrder,
+      history: [],
+      lastCleanupDate: null,
+      todaysTasksRootId: null,
+    },
+    // Minimal demo card so the board is not empty
+    nodes: {
+      [DEMO_CARD_ID]: {
+        id: DEMO_CARD_ID, parentId: null, childrenIds: [],
+        type: 'CHECKBOX', status: 'OPEN', content: 'Demo Card',
+        uiState: { isExpanded: true, isFocusMode: false },
+        labelIds: [], linkedNodeIds: [], isTodaysTask: false,
+        createdAt: new Date().toISOString(), completedAt: null,
+      },
+    },
+    rootOrder: [DEMO_CARD_ID],
+  }
+  await injectState(page, demoState)
+}

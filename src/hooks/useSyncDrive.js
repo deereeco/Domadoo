@@ -29,5 +29,5 @@ export function useSyncDrive() {
         state.setSyncStatus('error')
       }
     }, 2000)
-  }, [state.nodes, state.labels, state.rootOrder, state.activeFilters, state.theme, state.todaysTasksRootId])
+  }, [state.nodes, state.labels, state.rootOrder, state.activeFilters, state.theme, state.todaysTasksRootId, state.isDemoMode])
 }
