@@ -963,6 +963,7 @@ export const useStore = create((set, get) => ({
   exitDemoMode() {
     const { savedRealData } = get()
     if (!savedRealData) {
+      console.error('[exitDemoMode] savedRealData is null — real data cannot be restored. This should not happen.')
       get().clearDemoData()
       set({ isDemoMode: false, savedRealData: null })
       return
