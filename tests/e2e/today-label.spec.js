@@ -95,3 +95,79 @@ test.describe('Today label', () => {
     await expect(todayCard.locator('[data-testid^="node-"]').filter({ hasText: 'Card A' }).first()).toBeVisible()
   })
 })
+
+// ── Root card nesting in Today's Tasks ────────────────────────────────────────
+
+test.describe("Root card nesting in Today's Tasks", () => {
+  test.beforeEach(async ({ page }) => {
+    await setupMockState(page)
+    await page.goto('/Domadoo/')
+    await page.waitForSelector('[data-testid="board"]')
+    // Link Card A to Today's Tasks before each test
+    await page.locator(`[data-testid="today-toggle-card-${IDS.CARD_A}"]`).click()
+    await page.waitForTimeout(200)
+  })
+
+  test("nested children appear in Today's Tasks when root card is linked", async ({ page }) => {
+    const todayCard = page.locator('[data-testid="today-tasks-card"]')
+    await expect(todayCard.locator('[data-testid^="node-"]').filter({ hasText: 'Task A1' }).first()).toBeVisible()
+    await expect(todayCard.locator('[data-testid^="node-"]').filter({ hasText: 'Task A2' }).first()).toBeVisible()
+  })
+
+  test("adding child to original card syncs to Today's Tasks", async ({ page }) => {
+    const todayCard = page.locator('[data-testid="today-tasks-card"]')
+    const nodesSel = '[data-testid^="node-"]:not([data-testid^="node-handle-"])'
+    const countBefore = await todayCard.locator(nodesSel).count()
+
+    // Add a new child to Card A (the original)
+    await page.locator(`[data-testid="add-item-${IDS.CARD_A}"]`).click()
+    await page.waitForTimeout(200)
+
+    // A new linked node should appear in Today's Tasks too
+    await expect(todayCard.locator(nodesSel)).toHaveCount(countBefore + 1)
+  })
+
+  test("adding child inside Today's Tasks syncs to original card", async ({ page }) => {
+    const originalCard = page.locator(`[data-testid="card-${IDS.CARD_A}"]`)
+    const nodesSel = '[data-testid^="node-"]:not([data-testid^="node-handle-"])'
+    const countBefore = await originalCard.locator(nodesSel).count()
+
+    // Press Enter inside Task A1's today copy to create a new sibling in the Today view
+    const task_a1_today_id = `${IDS.TASK_A1}_today`
+    const taskA1Today = page.locator(`[data-testid="node-${task_a1_today_id}"]`)
+    await taskA1Today.locator('[contenteditable]').click()
+    await taskA1Today.locator('[contenteditable]').press('Enter')
+    await page.waitForTimeout(200)
+
+    // The new node should also appear in the original Card A
+    await expect(originalCard.locator(nodesSel)).toHaveCount(countBefore + 1)
+  })
+
+  test("deleting child from original removes it from Today's Tasks", async ({ page }) => {
+    const todayCard = page.locator('[data-testid="today-tasks-card"]')
+    await expect(todayCard.locator('[data-testid^="node-"]').filter({ hasText: 'Task A1' }).first()).toBeVisible()
+
+    // Hover Task A1 in the original card and click delete
+    const taskA1 = page.locator(`[data-testid="card-${IDS.CARD_A}"]`).locator(`[data-testid="node-${IDS.TASK_A1}"]`)
+    await taskA1.hover()
+    await taskA1.locator('button[title="Delete"]').click({ force: true })
+    await page.waitForTimeout(100)
+    // Confirm "Delete both" in the linked-node dialog (exact match to avoid strict mode violation)
+    await page.getByRole('button', { name: 'Delete both', exact: true }).click()
+    await page.waitForTimeout(200)
+
+    await expect(todayCard.locator('[data-testid^="node-"]').filter({ hasText: 'Task A1' })).toHaveCount(0)
+  })
+
+  test("unlinking root card removes all nested today copies", async ({ page }) => {
+    const todayCard = page.locator('[data-testid="today-tasks-card"]')
+    await expect(todayCard.locator('[data-testid^="node-"]').filter({ hasText: 'Task A1' }).first()).toBeVisible()
+
+    // Click the sun toggle again to unlink Card A
+    await page.locator(`[data-testid="today-toggle-card-${IDS.CARD_A}"]`).click()
+    await page.waitForTimeout(200)
+
+    await expect(todayCard.locator('[data-testid^="node-"]').filter({ hasText: 'Task A1' })).toHaveCount(0)
+    await expect(todayCard.locator('[data-testid^="node-"]').filter({ hasText: 'Task A2' })).toHaveCount(0)
+  })
+})
