@@ -897,6 +897,7 @@ export const useStore = create((set, get) => ({
       // Collect demo card and all its descendants + _today copies
       const toDelete = new Set()
       const collect = (nid) => {
+        if (toDelete.has(nid)) return
         const n = newNodes[nid]
         if (!n) return
         toDelete.add(nid)
