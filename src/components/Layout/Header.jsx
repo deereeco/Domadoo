@@ -1,15 +1,13 @@
 import { useState } from 'react'
 import ThemeToggle from './ThemeToggle.jsx'
 import KeyboardShortcutsHelp from '../UI/KeyboardShortcutsHelp.jsx'
-import DemoModal from '../DemoModal.jsx'
 import { useStore } from '../../store/useStore.js'
 import { signOut } from '../../services/googleAuth.js'
 import { version } from '../../../package.json'
 
 export default function Header() {
-  const { user, setShowDoneToday, showDoneToday, setShowLabelManager, syncStatus, addTodaysTasksCard, todaysTasksRootId, signOut: storeSignOut, dragMode, toggleDragMode, setShowHistory, showHistory, isDemoMode } = useStore()
+  const { user, setShowDoneToday, showDoneToday, setShowLabelManager, syncStatus, addTodaysTasksCard, todaysTasksRootId, signOut: storeSignOut, dragMode, toggleDragMode, setShowHistory, showHistory, isDemoMode, setShowDemoModal } = useStore()
   const [showHelp, setShowHelp] = useState(false)
-  const [showDemoModal, setShowDemoModal] = useState(false)
 
   const handleSignOut = () => {
     signOut()
@@ -100,7 +98,6 @@ export default function Header() {
           >
             {isDemoMode ? 'Demo ●' : 'Demo'}
           </button>
-          {showDemoModal && <DemoModal onClose={() => setShowDemoModal(false)} />}
 
           <div className="relative">
             <button

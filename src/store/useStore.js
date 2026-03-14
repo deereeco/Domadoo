@@ -26,6 +26,7 @@ const DEFAULT_STATE = {
   lastCleanupDate: null, // 'YYYY-MM-DD'   (persisted)
   pendingCleanupTasks: null, // [{id, content, originalId, resolved}] | null (ephemeral)
   showHistory: false,    // bool (ephemeral)
+  showDemoModal: false,  // bool (ephemeral)
   // Demo mode
   isDemoMode: false,
   savedRealData: null,   // { nodes, rootOrder, history, lastCleanupDate, todaysTasksRootId } | null
@@ -599,6 +600,10 @@ export const useStore = create((set, get) => ({
   // ── Daily Cleanup & History ─────────────────────────────────────────────────
   setShowHistory(val) {
     set({ showHistory: val })
+  },
+
+  setShowDemoModal(val) {
+    set({ showDemoModal: val })
   },
 
   updateHistoryTask(snapshotId, taskId, content) {

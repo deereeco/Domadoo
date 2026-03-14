@@ -20,9 +20,11 @@ export default function DayCleanupModal() {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex justify-end">
+      {/* Dimmed backdrop — does not close modal (all tasks must be resolved first) */}
+      <div className="flex-1 bg-black/20" />
       <div
-        className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-md border border-zinc-200 dark:border-zinc-700 max-h-[80vh] flex flex-col"
+        className="animate-slide-in-right bg-white dark:bg-zinc-900 w-full max-w-sm h-full border-l border-zinc-200 dark:border-zinc-700 shadow-2xl flex flex-col"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
