@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { useSortable, SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { useDroppable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
@@ -25,8 +25,14 @@ export default function RootCard({ nodeId }) {
   })
 
   const headerRef = useRef(null)
+  const confirmRef = useRef(null)
+  const [pendingDelete, setPendingDelete] = useState(false)
   const isCollapsed = !!collapsedCards[nodeId]
   const isPinned = !!pinnedCards[nodeId]
+
+  useEffect(() => {
+    if (pendingDelete) confirmRef.current?.focus()
+  }, [pendingDelete])
 
   const focusNode = useCallback((targetId) => {
     // Find the contenteditable in a node and focus it
@@ -122,19 +128,53 @@ export default function RootCard({ nodeId }) {
           {isTomorrow && (
             <span className="text-blue-500 text-xs font-semibold uppercase tracking-wide">Tomorrow</span>
           )}
-          <NodeContent
-            content={node.content}
-            onChange={val => updateNodeContent(nodeId, val)}
-            placeholder="Card title…"
-            className="flex-1 text-sm font-semibold text-zinc-700 dark:text-zinc-100"
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') {
-                e.preventDefault()
-                e.currentTarget.blur()
-                headerRef.current?.focus()
-              }
-            }}
-          />
+          {pendingDelete ? (
+            <div
+              ref={confirmRef}
+              tabIndex={0}
+              className="flex-1 text-sm font-semibold text-red-400 outline-none"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); deleteNode(nodeId) }
+                if (e.key === 'Escape') {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setPendingDelete(false)
+                  setTimeout(() => headerRef.current?.querySelector('[contenteditable]')?.focus(), 20)
+                }
+              }}
+            >
+              Delete card? ↵ confirm · Esc cancel
+            </div>
+          ) : (
+            <NodeContent
+              content={node.content}
+              onChange={val => updateNodeContent(nodeId, val)}
+              placeholder="Card title…"
+              className="flex-1 text-sm font-semibold text-zinc-700 dark:text-zinc-100"
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  e.preventDefault()
+                  e.currentTarget.blur()
+                  headerRef.current?.focus()
+                }
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  e.currentTarget.blur()
+                  headerRef.current?.focus()
+                  if (node.childrenIds.length > 0) {
+                    focusNode(node.childrenIds[0])
+                  } else {
+                    const newId = addChildNode(nodeId)
+                    setTimeout(() => focusNode(newId), 50)
+                  }
+                }
+                if (e.key === 'Backspace' && e.currentTarget.textContent === '') {
+                  e.preventDefault()
+                  setPendingDelete(true)
+                }
+              }}
+            />
+          )}
           {/* Drag handle — touch-none scoped here so pinch zoom works on card title area */}
           <span {...listeners} data-testid={`card-handle-${nodeId}`} className="flex-shrink-0 text-zinc-300 dark:text-zinc-600 touch-none" style={{ pointerEvents: 'auto' }} aria-hidden="true">
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
