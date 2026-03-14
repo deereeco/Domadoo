@@ -12,7 +12,6 @@ import DetailsModal from './components/DetailsModal/DetailsModal.jsx'
 import DoneTodayView from './components/DoneTodayView.jsx'
 import LabelManager from './components/Labels/LabelManager.jsx'
 import DayCleanupModal from './components/DayCleanupModal.jsx'
-import HistoryView from './components/HistoryView.jsx'
 import DemoModal from './components/DemoModal.jsx'
 
 function todayString() {
@@ -25,7 +24,7 @@ export default function App() {
     detailsModalNodeId, showDoneToday, showLabelManager, theme,
     lastCleanupDate, todaysTasksRootId,
     initCleanupDate, runDailyCleanup, seedDemoTodaysTasks,
-    pendingCleanupTasks, showHistory, showDemoModal, setShowDemoModal,
+    pendingCleanupTasks, showDemoModal, setShowDemoModal,
   } = useStore()
   const handleDebugTap = useDebugConsole()
 
@@ -121,7 +120,6 @@ export default function App() {
       {showDoneToday && <DoneTodayView />}
       {showLabelManager && <LabelManager />}
       {pendingCleanupTasks && pendingCleanupTasks.length > 0 && <DayCleanupModal />}
-      {showHistory && <HistoryView />}
       {showDemoModal && <DemoModal onClose={() => setShowDemoModal(false)} />}
 
       {/* Hidden debug tap zone — quadruple-tap bottom-right to open Eruda */}

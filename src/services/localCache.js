@@ -5,7 +5,7 @@ export function saveToCache(state) {
   try {
     // eslint-disable-next-line no-unused-vars
     const { user, syncStatus, detailsModalNodeId, showDoneToday, showLabelManager,
-            pendingCleanupTasks, showHistory,
+            pendingCleanupTasks, showHistory, historyViewDate,
             nestTargetId, nestZoneActive, ...persist } = state
     localStorage.setItem(KEY, JSON.stringify(persist))
   } catch (e) {

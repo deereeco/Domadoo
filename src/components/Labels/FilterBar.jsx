@@ -1,41 +1,80 @@
 import { useStore } from '../../store/useStore.js'
+import { formatSnapshotDateLabel, formatSnapshotCardTitle } from '../../utils/snapshotToNodes.js'
 
 export default function FilterBar() {
-  const { labels, activeFilters, setFilter, clearFilters, nodes } = useStore()
+  const { labels, activeFilters, setFilter, clearFilters, nodes, history, historyViewDate, setHistoryViewDate } = useStore()
 
   // Only show labels that are actually used on some node
   const usedLabelIds = new Set()
   Object.values(nodes).forEach(n => n.labelIds.forEach(id => usedLabelIds.add(id)))
   const usedLabels = Object.values(labels).filter(l => usedLabelIds.has(l.id))
 
-  if (usedLabels.length === 0) return null
-
   const hasActiveFilters = Object.values(activeFilters).some(v => v !== null)
 
+  // Sort history newest-first for dropdown
+  const sortedHistory = [...history].sort((a, b) => b.date.localeCompare(a.date))
+
+  const showBar = usedLabels.length > 0 || sortedHistory.length > 0
+  if (!showBar) return null
+
   return (
-    <div className="sticky top-14 z-30 bg-zinc-50/90 dark:bg-zinc-900/90 backdrop-blur border-b border-zinc-200 dark:border-zinc-800 px-4 py-2">
-      <div className="max-w-screen-xl mx-auto flex items-center gap-2 flex-wrap">
-        <span className="text-xs text-zinc-400 dark:text-zinc-500 font-medium mr-1">Filter:</span>
-        {usedLabels.map(label => {
-          const mode = activeFilters[label.id] ?? null
-          return (
-            <FilterChip
-              key={label.id}
-              label={label}
-              mode={mode}
-              onToggle={(nextMode) => setFilter(label.id, nextMode)}
-            />
-          )
-        })}
-        {hasActiveFilters && (
-          <button
-            onClick={clearFilters}
-            className="text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 px-2 py-0.5"
-          >
-            Clear
-          </button>
+    <div className="sticky top-14 z-30 bg-zinc-50/90 dark:bg-zinc-900/90 backdrop-blur border-b border-zinc-200 dark:border-zinc-800">
+      <div className="max-w-screen-xl mx-auto px-4 py-2 flex items-center gap-2 flex-wrap">
+
+        {usedLabels.length > 0 && (
+          <>
+            <span className="text-xs text-zinc-400 dark:text-zinc-500 font-medium mr-1">Filter:</span>
+            {usedLabels.map(label => {
+              const mode = activeFilters[label.id] ?? null
+              return (
+                <FilterChip
+                  key={label.id}
+                  label={label}
+                  mode={mode}
+                  onToggle={(nextMode) => setFilter(label.id, nextMode)}
+                />
+              )
+            })}
+            {hasActiveFilters && (
+              <button
+                onClick={clearFilters}
+                className="text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 px-2 py-0.5"
+              >
+                Clear
+              </button>
+            )}
+            {sortedHistory.length > 0 && (
+              <span className="text-zinc-200 dark:text-zinc-700 mx-1 select-none">|</span>
+            )}
+          </>
+        )}
+
+        {sortedHistory.length > 0 && (
+          <div className="flex items-center gap-1.5 ml-auto">
+            <span className="text-xs text-zinc-400 dark:text-zinc-500 font-medium">View:</span>
+            <select
+              value={historyViewDate ?? ''}
+              onChange={e => setHistoryViewDate(e.target.value || null)}
+              className="text-xs rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer"
+            >
+              <option value="">Today</option>
+              {sortedHistory.map(snap => (
+                <option key={snap.date} value={snap.date}>
+                  {formatSnapshotDateLabel(snap.date)}
+                </option>
+              ))}
+            </select>
+          </div>
         )}
       </div>
+
+      {historyViewDate && (
+        <div className="border-t border-amber-200 dark:border-amber-800 bg-amber-50/80 dark:bg-amber-950/30 px-4 py-1.5">
+          <p className="max-w-screen-xl mx-auto text-xs text-amber-700 dark:text-amber-400">
+            Viewing {formatSnapshotCardTitle(historyViewDate)} — read-only (text still editable for typo fixes)
+          </p>
+        </div>
+      )}
     </div>
   )
 }

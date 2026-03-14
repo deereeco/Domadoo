@@ -26,6 +26,7 @@ const DEFAULT_STATE = {
   lastCleanupDate: null, // 'YYYY-MM-DD'   (persisted)
   pendingCleanupTasks: null, // [{id, content, originalId, resolved}] | null (ephemeral)
   showHistory: false,    // bool (ephemeral)
+  historyViewDate: null, // 'YYYY-MM-DD' | null (ephemeral)
   showDemoModal: false,  // bool (ephemeral)
   // Demo mode
   isDemoMode: false,
@@ -602,6 +603,10 @@ export const useStore = create((set, get) => ({
     set({ showHistory: val })
   },
 
+  setHistoryViewDate(date) {
+    set({ historyViewDate: date })
+  },
+
   setShowDemoModal(val) {
     set({ showDemoModal: val })
   },
@@ -623,6 +628,61 @@ export const useStore = create((set, get) => ({
       const newHistory = [...state.history]
       newHistory[idx] = { ...snapshot, tasks: patchTask(snapshot.tasks) }
       return { history: newHistory }
+    })
+  },
+
+  markCompleteInPast(nodeId, date) {
+    set(state => {
+      const { nodes, history, rootOrder } = state
+      const node = nodes[nodeId]
+      if (!node) return {}
+
+      // Serialize the task tree using original IDs
+      const serialized = get()._serializeTaskTree(nodeId, nodes)
+      if (!serialized) return {}
+
+      // Override status to completed for the chosen past date
+      const task = { ...serialized, status: 'COMPLETED', completedAt: date + 'T00:00:00.000Z' }
+
+      // Find or create snapshot for date
+      let newHistory = [...history]
+      const existingIdx = newHistory.findIndex(s => s.date === date)
+      if (existingIdx >= 0) {
+        newHistory[existingIdx] = {
+          ...newHistory[existingIdx],
+          tasks: [...newHistory[existingIdx].tasks, task],
+        }
+      } else {
+        newHistory.push(createHistorySnapshot(date, [task]))
+      }
+
+      // Collect all node IDs to delete (node + all descendants)
+      const toDelete = new Set()
+      const collect = (nid) => {
+        if (!nodes[nid]) return
+        toDelete.add(nid)
+        nodes[nid].childrenIds.forEach(collect)
+      }
+      collect(nodeId)
+
+      const newNodes = { ...nodes }
+
+      // Update parent's childrenIds
+      if (node.parentId) {
+        const parent = newNodes[node.parentId]
+        if (parent) {
+          newNodes[node.parentId] = {
+            ...parent,
+            childrenIds: parent.childrenIds.filter(id => id !== nodeId),
+          }
+        }
+      }
+
+      const newRootOrder = node.parentId ? rootOrder : rootOrder.filter(id => id !== nodeId)
+
+      toDelete.forEach(nid => delete newNodes[nid])
+
+      return { nodes: newNodes, history: newHistory, rootOrder: newRootOrder }
     })
   },
 

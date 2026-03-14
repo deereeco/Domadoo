@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { useStore } from '../../store/useStore.js'
@@ -7,13 +7,14 @@ import { useNodeVisibility, useDescendantLabelColors } from '../../hooks/useNode
 import NodeContent from './NodeContent.jsx'
 import LabelPill from '../Labels/LabelPill.jsx'
 import LabelAssigner from '../Labels/LabelAssigner.jsx'
+import DatePickerPopover from './DatePickerPopover.jsx'
 
 export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
   const node = useStore(s => s.nodes[nodeId])
   const labels = useStore(s => s.labels)
   const { updateNodeContent, toggleComplete, toggleExpand, toggleNodeType,
           toggleLabelOnNode, deleteNode, openDetailsModal, addChildNode, dragMode,
-          linkToTodaysTasks, unlinkFromTodaysTasks, todaysTasksRootId } = useStore()
+          linkToTodaysTasks, unlinkFromTodaysTasks, todaysTasksRootId, markCompleteInPast } = useStore()
   const nodes = useStore(s => s.nodes)
 
   const visibility = useNodeVisibility()
@@ -23,7 +24,18 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
   const [showLabelAssigner, setShowLabelAssigner] = useState(false)
   const [showNodeMenu, setShowNodeMenu] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [showDatePicker, setShowDatePicker] = useState(false)
+  const datePickerRef = useRef(null)
   const nodeRef = useRef(null)
+
+  useEffect(() => {
+    if (!showDatePicker) return
+    const handler = (e) => {
+      if (!datePickerRef.current?.contains(e.target)) setShowDatePicker(false)
+    }
+    document.addEventListener('pointerdown', handler)
+    return () => document.removeEventListener('pointerdown', handler)
+  }, [showDatePicker])
 
   const nestTargetId = useStore(s => s.nestTargetId)
   const nestZoneActive = useStore(s => s.nestZoneActive)
@@ -310,6 +322,27 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
               </svg>
             </button>
           )}
+
+          {/* Mark complete in past */}
+          <div className="relative" ref={datePickerRef}>
+            <button
+              tabIndex={-1}
+              onClick={() => setShowDatePicker(v => !v)}
+              className="p-1 rounded text-zinc-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/30"
+              title="Mark as completed on a past date"
+            >
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <rect x="3" y="4" width="18" height="18" rx="2" strokeWidth={2} />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 2v4M8 2v4M3 10h18" />
+              </svg>
+            </button>
+            {showDatePicker && (
+              <DatePickerPopover
+                onSelectDate={(date) => markCompleteInPast(nodeId, date)}
+                onClose={() => setShowDatePicker(false)}
+              />
+            )}
+          </div>
 
           {/* Delete */}
           <button

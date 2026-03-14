@@ -6,7 +6,7 @@ import { signOut } from '../../services/googleAuth.js'
 import { version } from '../../../package.json'
 
 export default function Header() {
-  const { user, setShowDoneToday, showDoneToday, setShowLabelManager, syncStatus, addTodaysTasksCard, todaysTasksRootId, signOut: storeSignOut, dragMode, toggleDragMode, setShowHistory, showHistory, isDemoMode, setShowDemoModal } = useStore()
+  const { user, setShowDoneToday, showDoneToday, setShowLabelManager, syncStatus, addTodaysTasksCard, todaysTasksRootId, signOut: storeSignOut, dragMode, toggleDragMode, isDemoMode, setShowDemoModal } = useStore()
   const [showHelp, setShowHelp] = useState(false)
 
   const handleSignOut = () => {
@@ -52,18 +52,6 @@ export default function Header() {
             }`}
           >
             Done Today
-          </button>
-
-          <button
-            data-testid="history-btn"
-            onClick={() => setShowHistory(true)}
-            className={`px-3 py-1.5 text-xs rounded-lg font-medium transition-colors ${
-              showHistory
-                ? 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-400'
-                : 'text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'
-            }`}
-          >
-            History
           </button>
 
           <button
