@@ -5,13 +5,18 @@ import { saveToCache, loadFromCache, saveUser, loadUser, clearUser } from '../se
 const SYSTEM_TODAY_LABEL_ID = 'system-today-label-0000-000000000000'
 const SYSTEM_TODAY_LABEL = { id: SYSTEM_TODAY_LABEL_ID, name: 'Today', color: '#FCD34D', isSystem: true }
 
+const SYSTEM_TOMORROW_LABEL_ID = 'system-tomorrow-label-0000-000000000000'
+const SYSTEM_TOMORROW_LABEL = { id: SYSTEM_TOMORROW_LABEL_ID, name: 'Tomorrow', color: '#93C5FD', isSystem: true }
+
 const DEFAULT_STATE = {
   nodes: {},
-  labels: { [SYSTEM_TODAY_LABEL_ID]: SYSTEM_TODAY_LABEL },
+  labels: { [SYSTEM_TODAY_LABEL_ID]: SYSTEM_TODAY_LABEL, [SYSTEM_TOMORROW_LABEL_ID]: SYSTEM_TOMORROW_LABEL },
   rootOrder: [],
   activeFilters: {},
   todaysTasksRootId: null,
   todaysTasksLabelId: SYSTEM_TODAY_LABEL_ID,
+  tomorrowsTasksRootId: null,
+  tomorrowsTasksLabelId: SYSTEM_TOMORROW_LABEL_ID,
   theme: 'dark',
   user: null,
   detailsModalNodeId: null,
@@ -30,7 +35,7 @@ const DEFAULT_STATE = {
   showDemoModal: false,  // bool (ephemeral)
   // Demo mode
   isDemoMode: false,
-  savedRealData: null,   // { nodes, rootOrder, history, lastCleanupDate, todaysTasksRootId } | null
+  savedRealData: null,   // { nodes, rootOrder, history, lastCleanupDate, todaysTasksRootId, tomorrowsTasksRootId } | null
   // Card UI state (ephemeral)
   collapsedCards: {},    // { [nodeId]: true }
   pinnedCards: {},       // { [nodeId]: true }
@@ -41,9 +46,9 @@ export const useStore = create((set, get) => ({
 
   // ── Hydration ──────────────────────────────────────────────────────────────
   hydrate(data) {
-    // Ensure Today system label always exists (backward compat with old saves)
-    const labels = { [SYSTEM_TODAY_LABEL_ID]: SYSTEM_TODAY_LABEL, ...data.labels }
-    set({ ...DEFAULT_STATE, ...data, labels, todaysTasksLabelId: SYSTEM_TODAY_LABEL_ID })
+    // Ensure system labels always exist (backward compat with old saves)
+    const labels = { ...data.labels, [SYSTEM_TODAY_LABEL_ID]: SYSTEM_TODAY_LABEL, [SYSTEM_TOMORROW_LABEL_ID]: SYSTEM_TOMORROW_LABEL }
+    set({ ...DEFAULT_STATE, ...data, labels, todaysTasksLabelId: SYSTEM_TODAY_LABEL_ID, tomorrowsTasksLabelId: SYSTEM_TOMORROW_LABEL_ID })
   },
 
   // ── Drag Mode ──────────────────────────────────────────────────────────────
@@ -93,6 +98,27 @@ export const useStore = create((set, get) => ({
       todaysTasksRootId: node.id,
       // todaysTasksLabelId already set (SYSTEM_TODAY_LABEL_ID) — don't overwrite
     }))
+    return node.id
+  },
+
+  addTomorrowsTasksCard() {
+    const node = createNode({ parentId: null, content: "Tomorrow's Tasks" })
+    node.isTomorrowsTask = true
+    set(state => {
+      // Insert after Today's Tasks card (index 1) if it exists, else prepend
+      const rootOrder = [...state.rootOrder]
+      const todayIdx = state.todaysTasksRootId ? rootOrder.indexOf(state.todaysTasksRootId) : -1
+      if (todayIdx >= 0) {
+        rootOrder.splice(todayIdx + 1, 0, node.id)
+      } else {
+        rootOrder.unshift(node.id)
+      }
+      return {
+        nodes: { ...state.nodes, [node.id]: node },
+        rootOrder,
+        tomorrowsTasksRootId: node.id,
+      }
+    })
     return node.id
   },
 
@@ -497,6 +523,124 @@ export const useStore = create((set, get) => ({
     })
   },
 
+  // Link a node as a Tomorrow's Task (mirror of linkToTodaysTasks)
+  linkToTomorrowsTasks(nodeId) {
+    set(state => {
+      const tomorrowsId = state.tomorrowsTasksRootId
+      if (!tomorrowsId) return {}
+      const tomorrowsCard = state.nodes[tomorrowsId]
+      const node = state.nodes[nodeId]
+      if (!tomorrowsCard || !node) return {}
+
+      // Guard: already linked to tomorrow's tasks
+      if (node.linkedNodeIds.some(lid => state.nodes[lid]?.isTomorrowsTask)) return {}
+
+      const nodeUpdates = {}
+      const newNodes = {}
+
+      function createLinkedTree(originalId, tomorrowParentId) {
+        const original = nodeUpdates[originalId] || state.nodes[originalId]
+        if (!original) return
+        const linkedId = originalId + '_tomorrow'
+
+        nodeUpdates[originalId] = {
+          ...original,
+          linkedNodeIds: [...new Set([...original.linkedNodeIds, linkedId])],
+        }
+
+        const linkedChildIds = original.childrenIds.map(childId => {
+          createLinkedTree(childId, linkedId)
+          return childId + '_tomorrow'
+        })
+
+        newNodes[linkedId] = {
+          ...state.nodes[originalId],
+          id: linkedId,
+          parentId: tomorrowParentId,
+          childrenIds: linkedChildIds,
+          isTomorrowsTask: true,
+          isTodaysTask: false,
+          linkedNodeIds: [originalId],
+        }
+      }
+
+      createLinkedTree(nodeId, tomorrowsId)
+
+      // Apply tomorrow label to root original only
+      const tomorrowLabelId = state.tomorrowsTasksLabelId
+      if (tomorrowLabelId) {
+        nodeUpdates[nodeId] = {
+          ...nodeUpdates[nodeId],
+          labelIds: [...new Set([...nodeUpdates[nodeId].labelIds, tomorrowLabelId])],
+        }
+      }
+
+      const updatedTomorrowsCard = {
+        ...tomorrowsCard,
+        childrenIds: [...tomorrowsCard.childrenIds, nodeId + '_tomorrow'],
+      }
+
+      return {
+        nodes: {
+          ...state.nodes,
+          ...nodeUpdates,
+          ...newNodes,
+          [tomorrowsId]: updatedTomorrowsCard,
+        },
+      }
+    })
+  },
+
+  // Remove a linked tomorrow's copy and clean up the original
+  unlinkFromTomorrowsTasks(linkedNodeId) {
+    set(state => {
+      const linkedNode = state.nodes[linkedNodeId]
+      if (!linkedNode || !linkedNode.isTomorrowsTask) return {}
+
+      const newNodes = { ...state.nodes }
+
+      // Remove root linked copy from Tomorrow's Tasks card's childrenIds
+      const tomorrowsId = linkedNode.parentId
+      if (tomorrowsId && newNodes[tomorrowsId]) {
+        newNodes[tomorrowsId] = {
+          ...newNodes[tomorrowsId],
+          childrenIds: newNodes[tomorrowsId].childrenIds.filter(c => c !== linkedNodeId),
+        }
+      }
+
+      // Collect all _tomorrow descendants to delete
+      const toDelete = new Set()
+      const collect = (nid) => {
+        const n = newNodes[nid]
+        if (!n) return
+        toDelete.add(nid)
+        n.childrenIds.forEach(collect)
+      }
+      collect(linkedNodeId)
+
+      // Clean up linkedNodeIds on all originals; remove tomorrow label from root original only
+      toDelete.forEach(tid => {
+        const tomorrowCopy = newNodes[tid]
+        if (!tomorrowCopy) return
+        tomorrowCopy.linkedNodeIds.forEach(originalId => {
+          const original = newNodes[originalId]
+          if (!original) return
+          const filteredLinks = original.linkedNodeIds.filter(lid => lid !== tid)
+          let { labelIds } = original
+          if (tid === linkedNodeId && state.tomorrowsTasksLabelId) {
+            labelIds = labelIds.filter(lid => lid !== state.tomorrowsTasksLabelId)
+          }
+          newNodes[originalId] = { ...original, linkedNodeIds: filteredLinks, labelIds }
+        })
+      })
+
+      // Delete all collected _tomorrow nodes
+      toDelete.forEach(tid => delete newNodes[tid])
+
+      return { nodes: newNodes }
+    })
+  },
+
   // ── Labels ─────────────────────────────────────────────────────────────────
   addLabel(attrs = {}) {
     const label = createLabel(attrs)
@@ -556,6 +700,31 @@ export const useStore = create((set, get) => ({
       }
       return
     }
+    // Handle Tomorrow label specially — drives Tomorrow's Tasks linking
+    if (labelId === SYSTEM_TOMORROW_LABEL_ID) {
+      const state = get()
+      const node = state.nodes[nodeId]
+      if (!node) return
+      const hasLabel = node.labelIds.includes(labelId)
+      if (hasLabel) {
+        // Remove Tomorrow label → unlink from Tomorrow's Tasks
+        const linkedId = node.linkedNodeIds.find(lid => state.nodes[lid]?.isTomorrowsTask)
+        if (linkedId) {
+          get().unlinkFromTomorrowsTasks(linkedId)
+        } else {
+          set(s => {
+            const n = s.nodes[nodeId]
+            if (!n) return {}
+            return { nodes: { ...s.nodes, [nodeId]: { ...n, labelIds: n.labelIds.filter(l => l !== labelId) } } }
+          })
+        }
+      } else {
+        // Add Tomorrow label → create Tomorrow's Tasks card if needed, then link
+        if (!get().tomorrowsTasksRootId) get().addTomorrowsTasksCard()
+        get().linkToTomorrowsTasks(nodeId)
+      }
+      return
+    }
     // Normal label toggle
     set(state => {
       const node = state.nodes[nodeId]
@@ -601,6 +770,27 @@ export const useStore = create((set, get) => ({
       set(s => ({ rootOrder: s.rootOrder.filter(id => id !== s.todaysTasksRootId) }))
     } else {
       set(s => ({ rootOrder: [s.todaysTasksRootId, ...s.rootOrder] }))
+    }
+  },
+
+  toggleTomorrowsTasksCard() {
+    const { tomorrowsTasksRootId, rootOrder, addTomorrowsTasksCard } = get()
+    if (!tomorrowsTasksRootId) {
+      addTomorrowsTasksCard()
+    } else if (rootOrder.includes(tomorrowsTasksRootId)) {
+      set(s => ({ rootOrder: s.rootOrder.filter(id => id !== s.tomorrowsTasksRootId) }))
+    } else {
+      // Re-insert after Today's Tasks card if present, else prepend
+      set(s => {
+        const order = [...s.rootOrder]
+        const todayIdx = s.todaysTasksRootId ? order.indexOf(s.todaysTasksRootId) : -1
+        if (todayIdx >= 0) {
+          order.splice(todayIdx + 1, 0, s.tomorrowsTasksRootId)
+        } else {
+          order.unshift(s.tomorrowsTasksRootId)
+        }
+        return { rootOrder: order }
+      })
     }
   },
 
@@ -739,38 +929,168 @@ export const useStore = create((set, get) => ({
   runDailyCleanup() {
     set(state => {
       const { nodes, todaysTasksRootId, lastCleanupDate, history } = state
-      if (!todaysTasksRootId) return {}
-      const todaysCard = nodes[todaysTasksRootId]
+
+      // If no Today's Tasks card and no Tomorrow's Tasks card with tasks, nothing to do
+      if (!todaysTasksRootId && !state.tomorrowsTasksRootId) return {}
+
+      let newNodes = { ...nodes }
+      let newHistory = [...history]
+      let newRootOrder = [...state.rootOrder]
+
+      // ── Rollover Tomorrow's Tasks → Today's Tasks (silent) ──────────────────
+      if (state.tomorrowsTasksRootId) {
+        const tomorrowCard = newNodes[state.tomorrowsTasksRootId]
+        if (tomorrowCard && tomorrowCard.childrenIds.length > 0) {
+          // Ensure Today's Tasks card exists
+          let todaysId = todaysTasksRootId
+          if (!todaysId) {
+            const newTodayNode = createNode({ parentId: null, content: "Today's Tasks" })
+            newTodayNode.isTodaysTask = true
+            newNodes[newTodayNode.id] = newTodayNode
+            todaysId = newTodayNode.id
+            newRootOrder = [todaysId, ...newRootOrder]
+            // We will update state.todaysTasksRootId via the returned state below
+          }
+
+          const todayChildrenToAdd = []
+
+          tomorrowCard.childrenIds.forEach(tomorrowCopyId => {
+            const tomorrowCopy = newNodes[tomorrowCopyId]
+            if (!tomorrowCopy) return
+            const originalId = tomorrowCopy.linkedNodeIds[0]
+            if (!originalId) return
+            const original = newNodes[originalId]
+            if (!original) return
+
+            // 1. Collect all _tomorrow descendants to delete
+            const toDelete = new Set()
+            const collectDesc = (nid) => {
+              const n = newNodes[nid]
+              if (!n) return
+              toDelete.add(nid)
+              n.childrenIds.forEach(collectDesc)
+            }
+            collectDesc(tomorrowCopyId)
+
+            // 2. Update original: remove Tomorrow label, remove stale _tomorrow links
+            newNodes[originalId] = {
+              ...original,
+              labelIds: original.labelIds.filter(l => l !== state.tomorrowsTasksLabelId),
+              linkedNodeIds: original.linkedNodeIds.filter(l => !toDelete.has(l)),
+            }
+
+            // 3. Create _today copies inline (mirror of linkToTodaysTasks logic)
+            const nodeUpdates = {}
+            const newTodayNodes = {}
+
+            function createLinkedTree(srcId, todayParentId) {
+              const src = nodeUpdates[srcId] || newNodes[srcId]
+              if (!src) return
+              const linkedId = srcId + '_today'
+
+              nodeUpdates[srcId] = {
+                ...src,
+                linkedNodeIds: [...new Set([...src.linkedNodeIds, linkedId])],
+              }
+
+              const linkedChildIds = src.childrenIds.map(childId => {
+                createLinkedTree(childId, linkedId)
+                return childId + '_today'
+              })
+
+              newTodayNodes[linkedId] = {
+                ...src,
+                id: linkedId,
+                parentId: todayParentId,
+                childrenIds: linkedChildIds,
+                isTodaysTask: true,
+                isTomorrowsTask: false,
+                linkedNodeIds: [srcId],
+              }
+            }
+
+            createLinkedTree(originalId, todaysId)
+
+            // 4. Add Today label to original
+            const origAfterUpdate = nodeUpdates[originalId] || newNodes[originalId]
+            nodeUpdates[originalId] = {
+              ...origAfterUpdate,
+              labelIds: [...new Set([...origAfterUpdate.labelIds, state.todaysTasksLabelId])],
+            }
+
+            // Merge updates into newNodes
+            Object.assign(newNodes, nodeUpdates, newTodayNodes)
+
+            // Delete old _tomorrow copies
+            toDelete.forEach(tid => delete newNodes[tid])
+
+            todayChildrenToAdd.push(originalId + '_today')
+          })
+
+          // Update Today's Tasks card with new children
+          const todaysCard = newNodes[todaysId]
+          if (todaysCard) {
+            newNodes[todaysId] = {
+              ...todaysCard,
+              childrenIds: [...todaysCard.childrenIds, ...todayChildrenToAdd],
+            }
+          }
+
+          // Clear Tomorrow's Tasks card
+          newNodes[state.tomorrowsTasksRootId] = { ...tomorrowCard, childrenIds: [] }
+
+          // If we created a new Today's Tasks card, record its ID
+          if (!todaysTasksRootId) {
+            // Return early with updated state including new todaysTasksRootId
+            // We'll set it via the returned patch below
+            state = { ...state, todaysTasksRootId: todaysId }
+          }
+        }
+      }
+
+      // If there's still no Today's Tasks card, nothing more to do
+      const activeTodaysId = state.todaysTasksRootId || (newNodes && Object.values(newNodes).find(n => n.isTodaysTask && n.parentId === null)?.id)
+      if (!activeTodaysId) {
+        return {
+          nodes: newNodes,
+          rootOrder: newRootOrder,
+          lastCleanupDate: new Date().toISOString().split('T')[0],
+          tomorrowsTasksRootId: state.tomorrowsTasksRootId,
+        }
+      }
+
+      const todaysCard = newNodes[activeTodaysId]
       if (!todaysCard || todaysCard.childrenIds.length === 0) {
-        return { lastCleanupDate: new Date().toISOString().split('T')[0] }
+        return {
+          nodes: newNodes,
+          rootOrder: newRootOrder,
+          lastCleanupDate: new Date().toISOString().split('T')[0],
+          todaysTasksRootId: activeTodaysId,
+        }
       }
 
       const yesterdayDate = lastCleanupDate // the date we're archiving
 
       const allCheckboxDescendantsComplete = (nodeId) => {
-        const n = nodes[nodeId]
+        const n = newNodes[nodeId]
         if (!n) return true
         if (n.type === 'CHECKBOX' && n.status !== 'COMPLETED') return false
         return n.childrenIds.every(allCheckboxDescendantsComplete)
       }
 
       const completed = todaysCard.childrenIds.filter(id => {
-        const n = nodes[id]
+        const n = newNodes[id]
         return n?.status === 'COMPLETED' && allCheckboxDescendantsComplete(id)
       })
       const incomplete = todaysCard.childrenIds.filter(id => {
-        const n = nodes[id]
+        const n = newNodes[id]
         return n && n.status !== 'COMPLETED'
         // root-complete-but-subtasks-open: intentionally in neither bucket → auto-stay
       })
 
-      let newNodes = { ...nodes }
-      let newHistory = [...history]
-      let newRootOrder = [...state.rootOrder]
-
       // Archive completed tasks into a snapshot
       if (completed.length > 0) {
-        const snapshotTasks = completed.map(id => get()._serializeTaskTree(id, nodes)).filter(Boolean)
+        const snapshotTasks = completed.map(id => get()._serializeTaskTree(id, newNodes)).filter(Boolean)
 
         // Merge with existing snapshot for this date or create new
         const existingIdx = newHistory.findIndex(s => s.date === yesterdayDate)
@@ -799,9 +1119,9 @@ export const useStore = create((set, get) => ({
           collect(todayId)
 
           // Remove from Today's card children
-          const todaysCardNode = newNodes[todaysTasksRootId]
+          const todaysCardNode = newNodes[activeTodaysId]
           if (todaysCardNode) {
-            newNodes[todaysTasksRootId] = {
+            newNodes[activeTodaysId] = {
               ...todaysCardNode,
               childrenIds: todaysCardNode.childrenIds.filter(c => c !== todayId),
             }
@@ -832,8 +1152,8 @@ export const useStore = create((set, get) => ({
       if (incomplete.length > 0) {
         pendingCleanupTasks = incomplete.map(id => ({
           id,
-          content: nodes[id]?.content ?? '',
-          originalId: nodes[id]?.linkedNodeIds[0] ?? null,
+          content: newNodes[id]?.content ?? '',
+          originalId: newNodes[id]?.linkedNodeIds[0] ?? null,
           resolved: null, // 'today' | 'complete' | 'pushback'
         }))
       } else {
@@ -846,6 +1166,7 @@ export const useStore = create((set, get) => ({
         history: newHistory,
         lastCleanupDate: newLastCleanupDate,
         pendingCleanupTasks,
+        todaysTasksRootId: activeTodaysId,
       }
     })
   },
@@ -1001,9 +1322,10 @@ export const useStore = create((set, get) => ({
 
   clearDemoData() {
     const DEMO_CARD_ID = 'demo-card-seed-0000-0000-000000000001'
+    const DEMO_TMRW_CARD_ID = 'demo-tmrw-card-0000-0000-000000000002'
     set(state => {
       const newNodes = { ...state.nodes }
-      // Collect demo card and all its descendants + _today copies
+      // Collect demo cards and all their descendants + linked copies
       const toDelete = new Set()
       const collect = (nid) => {
         if (toDelete.has(nid)) return
@@ -1014,6 +1336,7 @@ export const useStore = create((set, get) => ({
         n.linkedNodeIds.forEach(lid => { if (newNodes[lid]) collect(lid) })
       }
       if (newNodes[DEMO_CARD_ID]) collect(DEMO_CARD_ID)
+      if (newNodes[DEMO_TMRW_CARD_ID]) collect(DEMO_TMRW_CARD_ID)
 
       toDelete.forEach(id => delete newNodes[id])
 
@@ -1027,6 +1350,9 @@ export const useStore = create((set, get) => ({
           if (!filtered.some(lid => newNodes[lid]?.isTodaysTask)) {
             labelIds = labelIds.filter(lid => lid !== state.todaysTasksLabelId)
           }
+          if (!filtered.some(lid => newNodes[lid]?.isTomorrowsTask)) {
+            labelIds = labelIds.filter(lid => lid !== state.tomorrowsTasksLabelId)
+          }
           newNodes[nid] = { ...n, linkedNodeIds: filtered, labelIds }
         }
       })
@@ -1037,6 +1363,15 @@ export const useStore = create((set, get) => ({
         newNodes[todaysId] = {
           ...newNodes[todaysId],
           childrenIds: newNodes[todaysId].childrenIds.filter(id => !toDelete.has(id)),
+        }
+      }
+
+      // Remove demo tasks from Tomorrow's Tasks children
+      const tomorrowsId = state.tomorrowsTasksRootId
+      if (tomorrowsId && newNodes[tomorrowsId]) {
+        newNodes[tomorrowsId] = {
+          ...newNodes[tomorrowsId],
+          childrenIds: newNodes[tomorrowsId].childrenIds.filter(id => !toDelete.has(id)),
         }
       }
 
@@ -1053,14 +1388,15 @@ export const useStore = create((set, get) => ({
 
   enterDemoMode() {
     if (get().isDemoMode) return
-    const { nodes, rootOrder, history, lastCleanupDate, todaysTasksRootId } = get()
+    const { nodes, rootOrder, history, lastCleanupDate, todaysTasksRootId, tomorrowsTasksRootId } = get()
     set({
-      savedRealData: { nodes, rootOrder, history, lastCleanupDate, todaysTasksRootId },
+      savedRealData: { nodes, rootOrder, history, lastCleanupDate, todaysTasksRootId, tomorrowsTasksRootId },
       nodes: {},
       rootOrder: [],
       history: [],
       lastCleanupDate: null,
       todaysTasksRootId: null,
+      tomorrowsTasksRootId: null,
       isDemoMode: true,
     })
     get().seedDemoTodaysTasks()
@@ -1080,6 +1416,7 @@ export const useStore = create((set, get) => ({
       history: savedRealData.history,
       lastCleanupDate: savedRealData.lastCleanupDate,
       todaysTasksRootId: savedRealData.todaysTasksRootId ?? null,
+      tomorrowsTasksRootId: savedRealData.tomorrowsTasksRootId ?? null,
       isDemoMode: false,
       savedRealData: null,
     })
@@ -1169,6 +1506,93 @@ export const useStore = create((set, get) => ({
       const newRootOrder = state.rootOrder.includes(demoCardId)
         ? state.rootOrder
         : [demoCardId, ...state.rootOrder]
+
+      return { nodes: newNodes, rootOrder: newRootOrder }
+    })
+  },
+
+  seedDemoTomorrowsTasks() {
+    if (!get().tomorrowsTasksRootId) get().addTomorrowsTasksCard()
+    const tomorrowsId = get().tomorrowsTasksRootId
+    const now = new Date().toISOString()
+
+    const demoSpec = [
+      { content: 'Write weekly report', status: 'OPEN', completedAt: null },
+      { content: 'Review Q1 budget', status: 'OPEN', completedAt: null },
+      { content: 'Schedule team sync', status: 'OPEN', completedAt: null },
+    ]
+
+    const demTmrwCardId = 'demo-tmrw-card-0000-0000-000000000002'
+    const entries = demoSpec.map((spec, i) => {
+      const origId = `demo-tmrw-orig-000${i}-000000000002`
+      const tomorrowId = origId + '_tomorrow'
+      return { ...spec, origId, tomorrowId }
+    })
+
+    set(state => {
+      const newNodes = { ...state.nodes }
+      const tomorrowsCard = newNodes[tomorrowsId]
+      if (!tomorrowsCard) return {}
+
+      const newChildIds = [...tomorrowsCard.childrenIds]
+      const origIds = []
+
+      entries.forEach(({ content, status, completedAt, origId, tomorrowId }) => {
+        origIds.push(origId)
+        newNodes[origId] = {
+          id: origId,
+          parentId: demTmrwCardId,
+          childrenIds: [],
+          type: 'CHECKBOX',
+          status,
+          content,
+          uiState: { isExpanded: true, isFocusMode: false },
+          labelIds: [state.tomorrowsTasksLabelId],
+          linkedNodeIds: [tomorrowId],
+          isTodaysTask: false,
+          isTomorrowsTask: false,
+          createdAt: now,
+          completedAt,
+        }
+        newNodes[tomorrowId] = {
+          id: tomorrowId,
+          parentId: tomorrowsId,
+          childrenIds: [],
+          type: 'CHECKBOX',
+          status,
+          content,
+          uiState: { isExpanded: true, isFocusMode: false },
+          labelIds: [],
+          linkedNodeIds: [origId],
+          isTodaysTask: false,
+          isTomorrowsTask: true,
+          createdAt: now,
+          completedAt,
+        }
+        newChildIds.push(tomorrowId)
+      })
+
+      newNodes[demTmrwCardId] = {
+        id: demTmrwCardId,
+        parentId: null,
+        childrenIds: origIds,
+        type: 'CHECKBOX',
+        status: 'OPEN',
+        content: 'Demo Tasks (Tomorrow)',
+        uiState: { isExpanded: true, isFocusMode: false },
+        labelIds: [],
+        linkedNodeIds: [],
+        isTodaysTask: false,
+        isTomorrowsTask: false,
+        createdAt: now,
+        completedAt: null,
+      }
+
+      newNodes[tomorrowsId] = { ...tomorrowsCard, childrenIds: newChildIds }
+
+      const newRootOrder = state.rootOrder.includes(demTmrwCardId)
+        ? state.rootOrder
+        : [...state.rootOrder, demTmrwCardId]
 
       return { nodes: newNodes, rootOrder: newRootOrder }
     })

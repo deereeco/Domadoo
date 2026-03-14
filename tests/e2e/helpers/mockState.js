@@ -7,6 +7,7 @@ export const IDS = {
   TASK_B1: 'test-node-b100-0000-0000-000000000005',
   TASK_B2: 'test-node-b200-0000-0000-000000000006',
   TODAY_LABEL: 'system-today-label-0000-000000000000',
+  TOMORROW_LABEL: 'system-tomorrow-label-0000-000000000000',
   // Cleanup test IDs
   TODAY_CARD: 'test-today-card-0000-000000000007',
   ORIG_COMPLETED: 'test-orig-comp-0000-000000000008',
@@ -22,6 +23,10 @@ export const IDS = {
   PARENT_TODAY:       'test-node-par0-0000-0000-000000000015_today',
   SUBTASK_DONE_TODAY: 'test-node-sub1-0000-0000-000000000016_today',
   SUBTASK_OPEN_TODAY: 'test-node-sub2-0000-0000-000000000017_today',
+  // Tomorrow's Tasks test IDs
+  TOMORROW_CARD:  'test-tmrw-card--0000-000000000019',
+  ORIG_TOMORROW:  'test-orig-tmrw--0000-000000000020',
+  TOMORROW_COPY:  'test-orig-tmrw--0000-000000000020_tomorrow',
   // Breadcrumb test IDs
   CARD_LAB:       'test-card-lab0-0000-0000-000000000010',
   TASK_CLEANING:  'test-node-cln0-0000-0000-000000000011',
@@ -374,4 +379,61 @@ export async function setupDemoModeState(page) {
     rootOrder: [DEMO_CARD_ID],
   }
   await injectState(page, demoState)
+}
+
+/**
+ * State with a Tomorrow's Tasks card containing one open task linked from Card A.
+ * Used to test Tomorrow's Tasks toggle, linking, unlinking, and rollover.
+ */
+export function buildTomorrowState({ withTodayCard = false, lastCleanupDate = isoDate(-1) } = {}) {
+  const nodes = {
+    [IDS.CARD_A]: {
+      ...node(IDS.CARD_A, null, [IDS.TASK_A1, IDS.TASK_A2], 'Card A'),
+    },
+    [IDS.TASK_A1]: {
+      ...node(IDS.TASK_A1, IDS.CARD_A, [], 'Task A1'),
+      labelIds: [IDS.TOMORROW_LABEL],
+      linkedNodeIds: [IDS.TOMORROW_COPY],
+    },
+    [IDS.TASK_A2]: node(IDS.TASK_A2, IDS.CARD_A, [], 'Task A2'),
+    [IDS.TOMORROW_CARD]: {
+      ...node(IDS.TOMORROW_CARD, null, [IDS.TOMORROW_COPY], "Tomorrow's Tasks"),
+      isTomorrowsTask: true,
+    },
+    [IDS.TOMORROW_COPY]: {
+      ...node(IDS.TOMORROW_COPY, IDS.TOMORROW_CARD, [], 'Task A1'),
+      isTomorrowsTask: true,
+      linkedNodeIds: [IDS.TASK_A1],
+    },
+  }
+
+  const rootOrder = withTodayCard
+    ? [IDS.TOMORROW_CARD, IDS.CARD_A]
+    : [IDS.TOMORROW_CARD, IDS.CARD_A]
+
+  return {
+    nodes,
+    labels: {
+      [IDS.TODAY_LABEL]: { id: IDS.TODAY_LABEL, name: 'Today', color: '#FCD34D', isSystem: true },
+      [IDS.TOMORROW_LABEL]: { id: IDS.TOMORROW_LABEL, name: 'Tomorrow', color: '#93C5FD', isSystem: true },
+    },
+    rootOrder,
+    activeFilters: {},
+    todaysTasksRootId: null,
+    todaysTasksLabelId: IDS.TODAY_LABEL,
+    tomorrowsTasksRootId: IDS.TOMORROW_CARD,
+    tomorrowsTasksLabelId: IDS.TOMORROW_LABEL,
+    theme: 'light',
+    dragMode: false,
+    nestTargetId: null,
+    nestZoneActive: false,
+    history: [],
+    lastCleanupDate,
+  }
+}
+
+export async function setupTomorrowState(page, opts = {}) {
+  await page.route('https://apis.google.com/**', route => route.abort())
+  await page.route('https://accounts.google.com/**', route => route.abort())
+  await injectState(page, buildTomorrowState(opts))
 }

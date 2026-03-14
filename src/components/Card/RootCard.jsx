@@ -9,7 +9,7 @@ import NodeContent from '../Node/NodeContent.jsx'
 export default function RootCard({ nodeId }) {
   const node = useStore(s => s.nodes[nodeId])
   const { updateNodeContent, addChildNode, deleteNode, updateNode, dragMode,
-          toggleLabelOnNode, todaysTasksLabelId,
+          toggleLabelOnNode, todaysTasksLabelId, tomorrowsTasksLabelId,
           collapsedCards, toggleCardCollapse,
           pinnedCards, toggleCardPin,
           openDetailsModal } = useStore()
@@ -39,7 +39,9 @@ export default function RootCard({ nodeId }) {
   if (!node) return null
 
   const isToday = node.isTodaysTask
+  const isTomorrow = node.isTomorrowsTask
   const hasTodayLabel = node.labelIds?.includes(todaysTasksLabelId)
+  const hasTomorrowLabel = node.labelIds?.includes(tomorrowsTasksLabelId)
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -52,11 +54,13 @@ export default function RootCard({ nodeId }) {
       ref={setNodeRef}
       style={style}
       data-nodeid={nodeId}
-      data-testid={isToday ? 'today-tasks-card' : `card-${nodeId}`}
+      data-testid={isToday ? 'today-tasks-card' : isTomorrow ? 'tomorrow-tasks-card' : `card-${nodeId}`}
       className={`break-inside-avoid mb-4 rounded-2xl border transition-shadow ${
         isToday
           ? 'border-amber-300 dark:border-amber-600 bg-amber-50/60 dark:bg-amber-950/30'
-          : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900'
+          : isTomorrow
+            ? 'border-blue-300 dark:border-blue-700 bg-blue-50/60 dark:bg-blue-950/30'
+            : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900'
       } ${isOver ? 'ring-2 ring-indigo-400' : ''} shadow-sm hover:shadow-md`}
     >
       {/* Card Header — listeners scoped to drag handle icon so touch-none doesn't block pinch zoom on the title */}
@@ -114,6 +118,9 @@ export default function RootCard({ nodeId }) {
         <div className={`flex items-center gap-2 flex-1 min-w-0 ${dragMode ? 'pointer-events-none' : 'contents'}`}>
           {isToday && (
             <span className="text-amber-500 text-xs font-semibold uppercase tracking-wide">Today</span>
+          )}
+          {isTomorrow && (
+            <span className="text-blue-500 text-xs font-semibold uppercase tracking-wide">Tomorrow</span>
           )}
           <NodeContent
             content={node.content}
@@ -173,7 +180,7 @@ export default function RootCard({ nodeId }) {
             </svg>
           </button>
 
-          {!isToday && todaysTasksLabelId && (
+          {!isToday && !isTomorrow && todaysTasksLabelId && (
             <button
               data-testid={`today-toggle-card-${nodeId}`}
               onClick={() => toggleLabelOnNode(nodeId, todaysTasksLabelId)}
@@ -184,6 +191,19 @@ export default function RootCard({ nodeId }) {
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                 <circle cx="12" cy="12" r="4" strokeWidth={2} />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+              </svg>
+            </button>
+          )}
+          {!isToday && !isTomorrow && tomorrowsTasksLabelId && (
+            <button
+              data-testid={`tomorrow-toggle-card-${nodeId}`}
+              onClick={() => toggleLabelOnNode(nodeId, tomorrowsTasksLabelId)}
+              className={`flex-shrink-0 transition-colors ${hasTomorrowLabel ? 'text-blue-400' : 'text-zinc-300 dark:text-zinc-600 hover:text-blue-400'}`}
+              title={hasTomorrowLabel ? "Remove from Tomorrow's Tasks" : "Add to Tomorrow's Tasks"}
+              tabIndex={-1}
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
               </svg>
             </button>
           )}
@@ -217,7 +237,7 @@ export default function RootCard({ nodeId }) {
 
             {node.childrenIds.length === 0 && (
               <p className="text-xs text-zinc-300 dark:text-zinc-700 py-1 px-1">
-                {isToday ? 'Drag tasks here or press + to add' : 'Press + to add tasks'}
+                {isToday ? 'Drag tasks here or press + to add' : isTomorrow ? 'Queue tasks here for tomorrow' : 'Press + to add tasks'}
               </p>
             )}
           </div>

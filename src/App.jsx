@@ -58,7 +58,7 @@ export default function App() {
         state.initCleanupDate(today)
         return
       }
-      if (state.lastCleanupDate !== today && state.todaysTasksRootId) {
+      if (state.lastCleanupDate !== today && (state.todaysTasksRootId || state.tomorrowsTasksRootId)) {
         state.runDailyCleanup()
       }
     }

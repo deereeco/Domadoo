@@ -4,7 +4,7 @@ import { formatSnapshotDateLabel, formatSnapshotCardTitle } from '../../utils/sn
 export default function FilterBar() {
   const {
     labels, activeFilters, setFilter, clearFilters, nodes, history, historyViewDate, setHistoryViewDate,
-    setShowLabelManager, toggleTodaysTasksCard, todaysTasksRootId, rootOrder,
+    setShowLabelManager, toggleTodaysTasksCard, todaysTasksRootId, toggleTomorrowsTasksCard, tomorrowsTasksRootId, rootOrder,
   } = useStore()
 
   // Only show labels that are actually used on some node
@@ -18,6 +18,7 @@ export default function FilterBar() {
   const sortedHistory = [...history].sort((a, b) => b.date.localeCompare(a.date))
 
   const todaysTasksVisible = todaysTasksRootId && rootOrder.includes(todaysTasksRootId)
+  const tomorrowsTasksVisible = tomorrowsTasksRootId && rootOrder.includes(tomorrowsTasksRootId)
 
   return (
     <div className="sticky top-14 z-30 bg-zinc-50/90 dark:bg-zinc-900/90 backdrop-blur border-b border-zinc-200 dark:border-zinc-800">
@@ -42,6 +43,20 @@ export default function FilterBar() {
           title={todaysTasksVisible ? "Hide Today's Tasks card" : "Show Today's Tasks card"}
         >
           Today's Tasks
+        </button>
+
+        {/* Toggle Tomorrow's Tasks button */}
+        <button
+          data-testid="toggle-tomorrows-tasks"
+          onClick={toggleTomorrowsTasksCard}
+          className={`px-2.5 py-1 text-xs rounded-lg font-medium transition-colors border ${
+            tomorrowsTasksVisible
+              ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400 border-blue-300 dark:border-blue-700'
+              : 'text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 border-zinc-200 dark:border-zinc-700'
+          }`}
+          title={tomorrowsTasksVisible ? "Hide Tomorrow's Tasks card" : "Show Tomorrow's Tasks card"}
+        >
+          Tomorrow's Tasks
         </button>
 
         {usedLabels.length > 0 && (

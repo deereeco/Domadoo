@@ -6,6 +6,7 @@ export default function DemoModal({ onClose }) {
     isDemoMode, enterDemoMode, exitDemoMode,
     todaysTasksRootId, nodes,
     initCleanupDate, runDailyCleanup,
+    seedDemoTomorrowsTasks,
   } = useStore()
 
   useEffect(() => {
@@ -22,6 +23,15 @@ export default function DemoModal({ onClose }) {
       initCleanupDate(yesterday.toISOString().split('T')[0])
       runDailyCleanup()
     }
+    onClose()
+  }
+
+  const handleNextWeek = () => {
+    seedDemoTomorrowsTasks()
+    const sevenDaysAgo = new Date()
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+    initCleanupDate(sevenDaysAgo.toISOString().split('T')[0])
+    runDailyCleanup()
     onClose()
   }
 
@@ -93,6 +103,24 @@ export default function DemoModal({ onClose }) {
               </div>
               <button
                 onClick={handleNextDay}
+                className="px-3 py-1.5 text-xs rounded-lg font-medium bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:opacity-80 transition-opacity"
+              >
+                Run scenario
+              </button>
+            </div>
+
+            <div
+              data-testid="demo-scenario-nextweek"
+              className="rounded-xl border border-zinc-200 dark:border-zinc-700 p-4 space-y-3"
+            >
+              <div>
+                <p className="text-sm font-medium text-zinc-900 dark:text-white">Next week →</p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">
+                  Seeds Tomorrow&apos;s Tasks and runs a weekly rollover — tomorrow&apos;s tasks move into Today&apos;s Tasks.
+                </p>
+              </div>
+              <button
+                onClick={handleNextWeek}
                 className="px-3 py-1.5 text-xs rounded-lg font-medium bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:opacity-80 transition-opacity"
               >
                 Run scenario

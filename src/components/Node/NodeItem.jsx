@@ -9,6 +9,52 @@ import LabelPill from '../Labels/LabelPill.jsx'
 import LabelAssigner from '../Labels/LabelAssigner.jsx'
 import DatePickerPopover from './DatePickerPopover.jsx'
 
+function TomorrowBreadcrumb({ node, nodes, tomorrowsTasksRootId }) {
+  const updateNode = useStore(s => s.updateNode)
+
+  if (!node.isTomorrowsTask) return null
+  if (node.parentId !== tomorrowsTasksRootId) return null
+  if (node.uiState?.breadcrumbErased) return null
+
+  const originalId = node.linkedNodeIds[0]
+  const original = nodes[originalId]
+  if (!original) return null
+
+  const crumbs = []
+  let cur = original.parentId ? nodes[original.parentId] : null
+  while (cur) {
+    crumbs.unshift(cur.content || 'Untitled')
+    cur = cur.parentId ? nodes[cur.parentId] : null
+  }
+  if (crumbs.length === 0) return null
+
+  const hidden = node.uiState?.breadcrumbHidden
+  const toggle = () => updateNode(node.id, { uiState: { ...node.uiState, breadcrumbHidden: !hidden } })
+  const erase  = () => updateNode(node.id, { uiState: { ...node.uiState, breadcrumbErased: true } })
+
+  if (hidden) {
+    return (
+      <button
+        onClick={toggle}
+        title="Show origin"
+        className="text-[11px] text-zinc-300 dark:text-zinc-600 hover:text-blue-400 italic mt-0.5"
+      >↩ origin hidden</button>
+    )
+  }
+
+  return (
+    <div data-testid={`breadcrumb-tomorrow-${node.id}`} className="flex items-center gap-0.5 mt-0.5 group/crumb">
+      <span className="text-[11px] text-blue-400 dark:text-blue-500 italic">
+        {crumbs.join(' → ')}
+      </span>
+      <span className="flex items-center gap-0.5 opacity-0 group-hover/crumb:opacity-100 transition-opacity ml-1">
+        <button onClick={toggle} title="Hide breadcrumb" className="text-[10px] text-zinc-300 hover:text-zinc-500 px-0.5">…</button>
+        <button onClick={erase}  title="Erase breadcrumb" className="text-[10px] text-zinc-300 hover:text-red-400 px-0.5">×</button>
+      </span>
+    </div>
+  )
+}
+
 function TodayBreadcrumb({ node, nodes, todaysTasksRootId }) {
   const updateNode = useStore(s => s.updateNode)
 
@@ -60,7 +106,9 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
   const labels = useStore(s => s.labels)
   const { updateNodeContent, toggleComplete, toggleExpand, toggleNodeType,
           toggleLabelOnNode, deleteNode, openDetailsModal, addChildNode, dragMode,
-          linkToTodaysTasks, unlinkFromTodaysTasks, todaysTasksRootId, markCompleteInPast } = useStore()
+          linkToTodaysTasks, unlinkFromTodaysTasks, todaysTasksRootId,
+          linkToTomorrowsTasks, unlinkFromTomorrowsTasks, tomorrowsTasksRootId,
+          markCompleteInPast } = useStore()
   const nodes = useStore(s => s.nodes)
 
   const visibility = useNodeVisibility()
@@ -108,8 +156,14 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
   // Today's Tasks linking
   const hasTodaysCopy = node.linkedNodeIds.some(lid => nodes[lid]?.isTodaysTask)
   const isTodaysCopy = node.isTodaysTask && node.linkedNodeIds.length > 0 && node.id !== todaysTasksRootId
-  const canAddToToday = todaysTasksRootId && !node.isTodaysTask && !hasTodaysCopy
-  const hasLinkedRelationship = hasTodaysCopy || isTodaysCopy
+  const canAddToToday = todaysTasksRootId && !node.isTodaysTask && !node.isTomorrowsTask && !hasTodaysCopy
+
+  // Tomorrow's Tasks linking
+  const hasTomorrowCopy = node.linkedNodeIds.some(lid => nodes[lid]?.isTomorrowsTask)
+  const isTomorrowsCopy = node.isTomorrowsTask && node.linkedNodeIds.length > 0 && node.id !== tomorrowsTasksRootId
+  const canAddToTomorrow = tomorrowsTasksRootId && !node.isTodaysTask && !node.isTomorrowsTask && !hasTomorrowCopy && !hasTodaysCopy
+
+  const hasLinkedRelationship = hasTodaysCopy || isTodaysCopy || hasTomorrowCopy || isTomorrowsCopy
 
   const style = {
     transform: (nestZoneActive && !isDragging) ? undefined : CSS.Transform.toString(transform),
@@ -298,6 +352,7 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
 
           {/* Breadcrumb — shows origin context for today-copy nodes */}
           <TodayBreadcrumb node={node} nodes={nodes} todaysTasksRootId={todaysTasksRootId} />
+          <TomorrowBreadcrumb node={node} nodes={nodes} tomorrowsTasksRootId={tomorrowsTasksRootId} />
         </div>
 
         {/* Node actions (shown on hover) */}
@@ -376,6 +431,21 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
             </button>
           )}
 
+          {/* Add to Tomorrow's Tasks */}
+          {canAddToTomorrow && (
+            <button
+              tabIndex={-1}
+              data-testid={`tomorrow-btn-${nodeId}`}
+              onClick={() => linkToTomorrowsTasks(nodeId)}
+              className="p-1 rounded text-zinc-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30"
+              title="Add to Tomorrow's Tasks"
+            >
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
+              </svg>
+            </button>
+          )}
+
           {/* Mark complete in past */}
           <div className="relative" ref={datePickerRef}>
             <button
@@ -443,9 +513,32 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
                 >Cancel</button>
               </div>
             </>
+          ) : isTomorrowsCopy ? (
+            <>
+              <p className="text-red-700 dark:text-red-300 mb-1.5 font-medium">Remove from Tomorrow&apos;s Tasks?</p>
+              <div className="flex gap-1.5 flex-wrap">
+                <button
+                  onClick={() => { unlinkFromTomorrowsTasks(nodeId); setShowDeleteConfirm(false) }}
+                  className="px-2 py-1 rounded bg-red-500 text-white hover:bg-red-600"
+                >Remove only</button>
+                <button
+                  onClick={() => {
+                    const originalId = node.linkedNodeIds[0]
+                    if (originalId) deleteNode(originalId, { deleteLinked: true })
+                    else unlinkFromTomorrowsTasks(nodeId)
+                    setShowDeleteConfirm(false)
+                  }}
+                  className="px-2 py-1 rounded bg-red-700 text-white hover:bg-red-800"
+                >Remove &amp; delete original</button>
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="px-2 py-1 rounded bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-300 dark:hover:bg-zinc-600"
+                >Cancel</button>
+              </div>
+            </>
           ) : (
             <>
-              <p className="text-red-700 dark:text-red-300 mb-1.5 font-medium">This task is linked in Today&apos;s Tasks.</p>
+              <p className="text-red-700 dark:text-red-300 mb-1.5 font-medium">This task is linked in Today&apos;s or Tomorrow&apos;s Tasks.</p>
               <div className="flex gap-1.5 flex-wrap">
                 <button
                   onClick={() => { deleteNode(nodeId, { deleteLinked: true }); setShowDeleteConfirm(false) }}
