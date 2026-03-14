@@ -720,8 +720,22 @@ export const useStore = create((set, get) => ({
 
       const yesterdayDate = lastCleanupDate // the date we're archiving
 
-      const completed = todaysCard.childrenIds.filter(id => nodes[id]?.status === 'COMPLETED')
-      const incomplete = todaysCard.childrenIds.filter(id => nodes[id] && nodes[id].status !== 'COMPLETED')
+      const allCheckboxDescendantsComplete = (nodeId) => {
+        const n = nodes[nodeId]
+        if (!n) return true
+        if (n.type === 'CHECKBOX' && n.status !== 'COMPLETED') return false
+        return n.childrenIds.every(allCheckboxDescendantsComplete)
+      }
+
+      const completed = todaysCard.childrenIds.filter(id => {
+        const n = nodes[id]
+        return n?.status === 'COMPLETED' && allCheckboxDescendantsComplete(id)
+      })
+      const incomplete = todaysCard.childrenIds.filter(id => {
+        const n = nodes[id]
+        return n && n.status !== 'COMPLETED'
+        // root-complete-but-subtasks-open: intentionally in neither bucket → auto-stay
+      })
 
       let newNodes = { ...nodes }
       let newHistory = [...history]

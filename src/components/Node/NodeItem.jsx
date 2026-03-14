@@ -232,8 +232,12 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
         {/* Checkbox or bullet */}
         {node.type === 'CHECKBOX' ? (
           <button
+            data-testid={`checkbox-${nodeId}`}
             tabIndex={-1}
             onClick={() => toggleComplete(nodeId)}
+            title={isCompleted && node.completedAt
+              ? `Completed ${new Date(node.completedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`
+              : undefined}
             className={`flex-shrink-0 mt-0.5 w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
               isCompleted
                 ? 'bg-emerald-500 border-emerald-500'

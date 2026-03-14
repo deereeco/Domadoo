@@ -13,6 +13,15 @@ export const IDS = {
   ORIG_INCOMPLETE: 'test-orig-inc--0000-000000000009',
   TODAY_COMPLETED: 'test-orig-comp-0000-000000000008_today',
   TODAY_INCOMPLETE: 'test-orig-inc--0000-000000000009_today',
+  // Subtask cleanup test IDs (issue #22)
+  SUBTASK_CARD:       'test-sub-card--0000-0000-000000000014',
+  PARENT_ORIG:        'test-node-par0-0000-0000-000000000015',
+  SUBTASK_DONE:       'test-node-sub1-0000-0000-000000000016',
+  SUBTASK_OPEN:       'test-node-sub2-0000-0000-000000000017',
+  TODAY_CARD_ST:      'test-today-st00-0000-0000-000000000018',
+  PARENT_TODAY:       'test-node-par0-0000-0000-000000000015_today',
+  SUBTASK_DONE_TODAY: 'test-node-sub1-0000-0000-000000000016_today',
+  SUBTASK_OPEN_TODAY: 'test-node-sub2-0000-0000-000000000017_today',
   // Breadcrumb test IDs
   CARD_LAB:       'test-card-lab0-0000-0000-000000000010',
   TASK_CLEANING:  'test-node-cln0-0000-0000-000000000011',
@@ -256,6 +265,88 @@ export async function setupFreshState(page) {
  * Sets up state already in demo mode (isDemoMode: true), with savedRealData pointing
  * to a simple two-card board. The visible state shows demo's Today's Tasks card.
  */
+/**
+ * State for subtask-aware archiving tests (issue #22):
+ *   Card A
+ *     └─ Cleaning (COMPLETED, root)
+ *          ├─ table (COMPLETED subtask)
+ *          └─ windows (OPEN subtask)
+ *
+ *   Today's Tasks
+ *     └─ Cleaning (today-copy, COMPLETED root, but windows still OPEN)
+ *
+ * lastCleanupDate = yesterday → triggers cleanup on load.
+ * Expected: task auto-stays in Today's Tasks (no modal, not archived).
+ */
+export function buildSubtaskCleanupState() {
+  const parentCompletedAt = isoDate(-1) + 'T10:00:00Z'
+  const subtaskCompletedAt = isoDate(-2) + 'T09:00:00Z'
+  return {
+    nodes: {
+      [IDS.SUBTASK_CARD]: node(IDS.SUBTASK_CARD, null, [IDS.PARENT_ORIG], 'Card A'),
+      [IDS.PARENT_ORIG]: {
+        ...node(IDS.PARENT_ORIG, IDS.SUBTASK_CARD, [IDS.SUBTASK_DONE, IDS.SUBTASK_OPEN], 'Cleaning'),
+        status: 'COMPLETED',
+        completedAt: parentCompletedAt,
+        labelIds: [IDS.TODAY_LABEL],
+        linkedNodeIds: [IDS.PARENT_TODAY],
+      },
+      [IDS.SUBTASK_DONE]: {
+        ...node(IDS.SUBTASK_DONE, IDS.PARENT_ORIG, [], 'table'),
+        status: 'COMPLETED',
+        completedAt: subtaskCompletedAt,
+        linkedNodeIds: [IDS.SUBTASK_DONE_TODAY],
+      },
+      [IDS.SUBTASK_OPEN]: {
+        ...node(IDS.SUBTASK_OPEN, IDS.PARENT_ORIG, [], 'windows'),
+        linkedNodeIds: [IDS.SUBTASK_OPEN_TODAY],
+      },
+      [IDS.TODAY_CARD_ST]: {
+        ...node(IDS.TODAY_CARD_ST, null, [IDS.PARENT_TODAY], "Today's Tasks"),
+        isTodaysTask: true,
+      },
+      [IDS.PARENT_TODAY]: {
+        ...node(IDS.PARENT_TODAY, IDS.TODAY_CARD_ST, [IDS.SUBTASK_DONE_TODAY, IDS.SUBTASK_OPEN_TODAY], 'Cleaning'),
+        status: 'COMPLETED',
+        completedAt: parentCompletedAt,
+        isTodaysTask: true,
+        linkedNodeIds: [IDS.PARENT_ORIG],
+      },
+      [IDS.SUBTASK_DONE_TODAY]: {
+        ...node(IDS.SUBTASK_DONE_TODAY, IDS.PARENT_TODAY, [], 'table'),
+        status: 'COMPLETED',
+        completedAt: subtaskCompletedAt,
+        isTodaysTask: true,
+        linkedNodeIds: [IDS.SUBTASK_DONE],
+      },
+      [IDS.SUBTASK_OPEN_TODAY]: {
+        ...node(IDS.SUBTASK_OPEN_TODAY, IDS.PARENT_TODAY, [], 'windows'),
+        isTodaysTask: true,
+        linkedNodeIds: [IDS.SUBTASK_OPEN],
+      },
+    },
+    labels: {
+      [IDS.TODAY_LABEL]: { id: IDS.TODAY_LABEL, name: 'Today', color: '#FCD34D', isSystem: true },
+    },
+    rootOrder: [IDS.TODAY_CARD_ST, IDS.SUBTASK_CARD],
+    activeFilters: {},
+    todaysTasksRootId: IDS.TODAY_CARD_ST,
+    todaysTasksLabelId: IDS.TODAY_LABEL,
+    theme: 'light',
+    dragMode: false,
+    nestTargetId: null,
+    nestZoneActive: false,
+    history: [],
+    lastCleanupDate: isoDate(-1),
+  }
+}
+
+export async function setupSubtaskCleanupState(page) {
+  await page.route('https://apis.google.com/**', route => route.abort())
+  await page.route('https://accounts.google.com/**', route => route.abort())
+  await injectState(page, buildSubtaskCleanupState())
+}
+
 export async function setupDemoModeState(page) {
   await page.route('https://apis.google.com/**', route => route.abort())
   await page.route('https://accounts.google.com/**', route => route.abort())
