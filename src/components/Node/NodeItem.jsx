@@ -9,6 +9,52 @@ import LabelPill from '../Labels/LabelPill.jsx'
 import LabelAssigner from '../Labels/LabelAssigner.jsx'
 import DatePickerPopover from './DatePickerPopover.jsx'
 
+function TodayBreadcrumb({ node, nodes, todaysTasksRootId }) {
+  const updateNode = useStore(s => s.updateNode)
+
+  if (!node.isTodaysTask) return null
+  if (node.parentId !== todaysTasksRootId) return null
+  if (node.uiState?.breadcrumbErased) return null
+
+  const originalId = node.linkedNodeIds[0]
+  const original = nodes[originalId]
+  if (!original) return null
+
+  const crumbs = []
+  let cur = original.parentId ? nodes[original.parentId] : null
+  while (cur) {
+    crumbs.unshift(cur.content || 'Untitled')
+    cur = cur.parentId ? nodes[cur.parentId] : null
+  }
+  if (crumbs.length === 0) return null
+
+  const hidden = node.uiState?.breadcrumbHidden
+  const toggle = () => updateNode(node.id, { uiState: { ...node.uiState, breadcrumbHidden: !hidden } })
+  const erase  = () => updateNode(node.id, { uiState: { ...node.uiState, breadcrumbErased: true } })
+
+  if (hidden) {
+    return (
+      <button
+        onClick={toggle}
+        title="Show origin"
+        className="text-[11px] text-zinc-300 dark:text-zinc-600 hover:text-zinc-500 italic mt-0.5"
+      >↩ origin hidden</button>
+    )
+  }
+
+  return (
+    <div data-testid={`breadcrumb-${node.id}`} className="flex items-center gap-0.5 mt-0.5 group/crumb">
+      <span className="text-[11px] text-zinc-400 dark:text-zinc-500 italic">
+        {crumbs.join(' → ')}
+      </span>
+      <span className="flex items-center gap-0.5 opacity-0 group-hover/crumb:opacity-100 transition-opacity ml-1">
+        <button onClick={toggle} title="Hide breadcrumb" className="text-[10px] text-zinc-300 hover:text-zinc-500 px-0.5">…</button>
+        <button onClick={erase}  title="Erase breadcrumb" className="text-[10px] text-zinc-300 hover:text-red-400 px-0.5">×</button>
+      </span>
+    </div>
+  )
+}
+
 export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
   const node = useStore(s => s.nodes[nodeId])
   const labels = useStore(s => s.labels)
@@ -245,6 +291,9 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
           {vis.hasHiddenChildren && node.uiState.isExpanded && (
             <p className="text-[10px] text-zinc-400 italic mt-0.5">Some items hidden by filter</p>
           )}
+
+          {/* Breadcrumb — shows origin context for today-copy nodes */}
+          <TodayBreadcrumb node={node} nodes={nodes} todaysTasksRootId={todaysTasksRootId} />
         </div>
 
         {/* Node actions (shown on hover) */}

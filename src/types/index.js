@@ -8,7 +8,7 @@ export function createNode({ parentId = null, type = 'CHECKBOX', content = '' } 
     type,
     status: 'OPEN',
     content,
-    uiState: { isExpanded: true, isFocusMode: false },
+    uiState: { isExpanded: true, isFocusMode: false, breadcrumbHidden: false, breadcrumbErased: false },
     labelIds: [],
     linkedNodeIds: [],
     isTodaysTask: false,

@@ -13,6 +13,13 @@ export const IDS = {
   ORIG_INCOMPLETE: 'test-orig-inc--0000-000000000009',
   TODAY_COMPLETED: 'test-orig-comp-0000-000000000008_today',
   TODAY_INCOMPLETE: 'test-orig-inc--0000-000000000009_today',
+  // Breadcrumb test IDs
+  CARD_LAB:       'test-card-lab0-0000-0000-000000000010',
+  TASK_CLEANING:  'test-node-cln0-0000-0000-000000000011',
+  TASK_TABLE:     'test-node-tbl0-0000-0000-000000000012',
+  TODAY_CARD_BC:  'test-today-bc00-0000-0000-000000000013',
+  TODAY_TABLE:    'test-node-tbl0-0000-0000-000000000012_today',
+  TODAY_CLEANING: 'test-node-cln0-0000-0000-000000000011_today',
 }
 
 function node(id, parentId, childrenIds, content) {
@@ -163,6 +170,77 @@ export async function setupCleanupState(page, opts = {}) {
   await page.route('https://accounts.google.com/**', route => route.abort())
   const state = buildCleanupState({ lastCleanupDate: isoDate(-1), ...opts })
   await injectState(page, state)
+}
+
+/**
+ * State for breadcrumb tests:
+ *   Card "Lab"
+ *     └─ Task "Cleaning"
+ *          └─ Subtask "table"
+ *
+ *   Today's Tasks root
+ *     └─ "table" (today-copy, direct child of Today root) ← breadcrumb should show "Lab → Cleaning"
+ *
+ * The `nested` option adds "Cleaning" as a today-copy parent of "table", so breadcrumb should disappear.
+ */
+export function buildBreadcrumbState({ nested = false } = {}) {
+  const nodes = {
+    [IDS.CARD_LAB]: {
+      ...node(IDS.CARD_LAB, null, [IDS.TASK_CLEANING], 'Lab'),
+    },
+    [IDS.TASK_CLEANING]: {
+      ...node(IDS.TASK_CLEANING, IDS.CARD_LAB, [IDS.TASK_TABLE], 'Cleaning'),
+      linkedNodeIds: nested ? [IDS.TODAY_CLEANING] : [],
+    },
+    [IDS.TASK_TABLE]: {
+      ...node(IDS.TASK_TABLE, IDS.TASK_CLEANING, [], 'table'),
+      linkedNodeIds: [IDS.TODAY_TABLE],
+    },
+    [IDS.TODAY_CARD_BC]: {
+      ...node(IDS.TODAY_CARD_BC, null,
+        nested ? [IDS.TODAY_CLEANING] : [IDS.TODAY_TABLE],
+        "Today's Tasks"),
+      isTodaysTask: true,
+    },
+    [IDS.TODAY_TABLE]: {
+      ...node(IDS.TODAY_TABLE,
+        nested ? IDS.TODAY_CLEANING : IDS.TODAY_CARD_BC,
+        [], 'table'),
+      isTodaysTask: true,
+      linkedNodeIds: [IDS.TASK_TABLE],
+    },
+  }
+
+  if (nested) {
+    nodes[IDS.TODAY_CLEANING] = {
+      ...node(IDS.TODAY_CLEANING, IDS.TODAY_CARD_BC, [IDS.TODAY_TABLE], 'Cleaning'),
+      isTodaysTask: true,
+      linkedNodeIds: [IDS.TASK_CLEANING],
+    }
+  }
+
+  return {
+    nodes,
+    labels: {
+      [IDS.TODAY_LABEL]: { id: IDS.TODAY_LABEL, name: 'Today', color: '#FCD34D', isSystem: true },
+    },
+    rootOrder: [IDS.TODAY_CARD_BC, IDS.CARD_LAB],
+    activeFilters: {},
+    todaysTasksRootId: IDS.TODAY_CARD_BC,
+    todaysTasksLabelId: IDS.TODAY_LABEL,
+    theme: 'light',
+    dragMode: false,
+    nestTargetId: null,
+    nestZoneActive: false,
+    history: [],
+    lastCleanupDate: null,
+  }
+}
+
+export async function setupBreadcrumbState(page, opts = {}) {
+  await page.route('https://apis.google.com/**', route => route.abort())
+  await page.route('https://accounts.google.com/**', route => route.abort())
+  await injectState(page, buildBreadcrumbState(opts))
 }
 
 /**
