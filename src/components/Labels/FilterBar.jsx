@@ -2,7 +2,10 @@ import { useStore } from '../../store/useStore.js'
 import { formatSnapshotDateLabel, formatSnapshotCardTitle } from '../../utils/snapshotToNodes.js'
 
 export default function FilterBar() {
-  const { labels, activeFilters, setFilter, clearFilters, nodes, history, historyViewDate, setHistoryViewDate } = useStore()
+  const {
+    labels, activeFilters, setFilter, clearFilters, nodes, history, historyViewDate, setHistoryViewDate,
+    setShowLabelManager, toggleTodaysTasksCard, todaysTasksRootId, rootOrder,
+  } = useStore()
 
   // Only show labels that are actually used on some node
   const usedLabelIds = new Set()
@@ -14,15 +17,36 @@ export default function FilterBar() {
   // Sort history newest-first for dropdown
   const sortedHistory = [...history].sort((a, b) => b.date.localeCompare(a.date))
 
-  const showBar = usedLabels.length > 0 || sortedHistory.length > 0
-  if (!showBar) return null
+  const todaysTasksVisible = todaysTasksRootId && rootOrder.includes(todaysTasksRootId)
 
   return (
     <div className="sticky top-14 z-30 bg-zinc-50/90 dark:bg-zinc-900/90 backdrop-blur border-b border-zinc-200 dark:border-zinc-800">
       <div className="max-w-screen-xl mx-auto px-4 py-2 flex items-center gap-2 flex-wrap">
 
+        {/* Labels button */}
+        <button
+          onClick={() => setShowLabelManager(true)}
+          className="px-2.5 py-1 text-xs rounded-lg font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors border border-zinc-200 dark:border-zinc-700"
+        >
+          Labels
+        </button>
+
+        {/* Toggle Today's Tasks button */}
+        <button
+          onClick={toggleTodaysTasksCard}
+          className={`px-2.5 py-1 text-xs rounded-lg font-medium transition-colors border ${
+            todaysTasksVisible
+              ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400 border-amber-300 dark:border-amber-700'
+              : 'text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 border-zinc-200 dark:border-zinc-700'
+          }`}
+          title={todaysTasksVisible ? "Hide Today's Tasks card" : "Show Today's Tasks card"}
+        >
+          Today's Tasks
+        </button>
+
         {usedLabels.length > 0 && (
           <>
+            <span className="text-zinc-200 dark:text-zinc-700 mx-1 select-none">|</span>
             <span className="text-xs text-zinc-400 dark:text-zinc-500 font-medium mr-1">Filter:</span>
             {usedLabels.map(label => {
               const mode = activeFilters[label.id] ?? null
@@ -43,14 +67,14 @@ export default function FilterBar() {
                 Clear
               </button>
             )}
-            {sortedHistory.length > 0 && (
-              <span className="text-zinc-200 dark:text-zinc-700 mx-1 select-none">|</span>
-            )}
           </>
         )}
 
         {sortedHistory.length > 0 && (
           <div className="flex items-center gap-1.5 ml-auto">
+            {usedLabels.length > 0 && (
+              <span className="text-zinc-200 dark:text-zinc-700 mx-1 select-none">|</span>
+            )}
             <span className="text-xs text-zinc-400 dark:text-zinc-500 font-medium">View:</span>
             <select
               data-testid="history-date-select"

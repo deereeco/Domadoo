@@ -34,13 +34,17 @@ function BoardDropZone({ activeDragType }) {
 }
 
 export default function Board() {
-  const { rootOrder, nodes, addRootNode, moveNode, reorderRootCards, reorderChildren, dragMode, linkToTodaysTasks, todaysTasksRootId, setNestTarget, clearNestTarget, setNestZoneActive, historyViewDate } = useStore()
+  const { rootOrder, nodes, addRootNode, moveNode, reorderRootCards, reorderChildren, dragMode, linkToTodaysTasks, todaysTasksRootId, setNestTarget, clearNestTarget, setNestZoneActive, historyViewDate, pinnedCards } = useStore()
   useBoardKeyNav()
 
   const [activeDragType, setActiveDragType] = useState(null)
   const nestTimerRef = useRef(null)
   const currentNestOverRef = useRef(null)
   const nestZoneActiveRef = useRef(false)
+
+  // Split rootOrder into pinned and unpinned
+  const pinnedIds = rootOrder.filter(id => pinnedCards[id])
+  const unpinnedIds = rootOrder.filter(id => !pinnedCards[id])
 
   // Collision detection runs on every pointermove — ideal place to track zone changes.
   // onDragOver only fires when `over` changes, which misses zone transitions within the same target.
@@ -239,9 +243,31 @@ export default function Board() {
         </button>
       )}
       <div data-testid="board" onClick={handleBgTap} className="max-w-screen-xl mx-auto px-4 py-6">
-        <SortableContext items={rootOrder} strategy={rectSortingStrategy}>
+
+        {/* Pinned section */}
+        {pinnedIds.length > 0 && (
+          <div className="mb-6">
+            <div className="flex items-center gap-2 mb-3">
+              <svg className="w-3.5 h-3.5 text-indigo-400" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/>
+              </svg>
+              <span className="text-xs font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wide">Pinned</span>
+            </div>
+            <SortableContext items={pinnedIds} strategy={rectSortingStrategy}>
+              <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4">
+                {pinnedIds.map(id => (
+                  <RootCard key={id} nodeId={id} />
+                ))}
+              </div>
+            </SortableContext>
+            <div className="mt-6 border-b border-zinc-200 dark:border-zinc-800" />
+          </div>
+        )}
+
+        {/* Main board */}
+        <SortableContext items={unpinnedIds} strategy={rectSortingStrategy}>
           <div data-testid="card-list" className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4">
-            {rootOrder.map(id => (
+            {unpinnedIds.map(id => (
               <RootCard key={id} nodeId={id} />
             ))}
           </div>
@@ -255,28 +281,7 @@ export default function Board() {
               </svg>
             </div>
             <h2 className="text-lg font-medium text-zinc-500 dark:text-zinc-400 mb-1">Your board is empty</h2>
-            <p className="text-sm text-zinc-400 dark:text-zinc-600 mb-6">Create a card to get started</p>
-            <button
-              onClick={addRootNode}
-              className="px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-medium rounded-xl transition-colors"
-            >
-              + New Card
-            </button>
-          </div>
-        )}
-
-        {rootOrder.length > 0 && !activeDragType && (
-          <div className="mt-4">
-            <button
-              data-testid="add-card-btn"
-              onClick={addRootNode}
-              className="flex items-center gap-2 px-4 py-2 text-sm text-zinc-400 dark:text-zinc-600 hover:text-zinc-600 dark:hover:text-zinc-300 border border-dashed border-zinc-300 dark:border-zinc-700 rounded-xl hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors w-full justify-center"
-            >
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v14M5 12h14" />
-              </svg>
-              New Card
-            </button>
+            <p className="text-sm text-zinc-400 dark:text-zinc-600 mb-6">Use the New Card button above to get started</p>
           </div>
         )}
 

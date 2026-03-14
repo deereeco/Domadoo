@@ -31,6 +31,9 @@ const DEFAULT_STATE = {
   // Demo mode
   isDemoMode: false,
   savedRealData: null,   // { nodes, rootOrder, history, lastCleanupDate, todaysTasksRootId } | null
+  // Card UI state (ephemeral)
+  collapsedCards: {},    // { [nodeId]: true }
+  pinnedCards: {},       // { [nodeId]: true }
 }
 
 export const useStore = create((set, get) => ({
@@ -575,6 +578,30 @@ export const useStore = create((set, get) => ({
 
   clearFilters() {
     set({ activeFilters: {} })
+  },
+
+  // ── Card UI State ──────────────────────────────────────────────────────────
+  toggleCardCollapse(nodeId) {
+    set(s => ({
+      collapsedCards: { ...s.collapsedCards, [nodeId]: !s.collapsedCards[nodeId] },
+    }))
+  },
+
+  toggleCardPin(nodeId) {
+    set(s => ({
+      pinnedCards: { ...s.pinnedCards, [nodeId]: !s.pinnedCards[nodeId] },
+    }))
+  },
+
+  toggleTodaysTasksCard() {
+    const { todaysTasksRootId, rootOrder, addTodaysTasksCard } = get()
+    if (!todaysTasksRootId) {
+      addTodaysTasksCard()
+    } else if (rootOrder.includes(todaysTasksRootId)) {
+      set(s => ({ rootOrder: s.rootOrder.filter(id => id !== s.todaysTasksRootId) }))
+    } else {
+      set(s => ({ rootOrder: [s.todaysTasksRootId, ...s.rootOrder] }))
+    }
   },
 
   // ── UI State ───────────────────────────────────────────────────────────────

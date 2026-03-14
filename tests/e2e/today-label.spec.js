@@ -4,7 +4,7 @@ import { setupMockState, IDS } from './helpers/mockState.js'
 // Helper: open the label assigner for a node and click the Today label option
 async function assignTodayLabel(page, nodeId) {
   await page.locator(`[data-testid="node-${nodeId}"]`).hover()
-  await page.locator(`[data-testid="node-${nodeId}"] button[title="Add label"]`).click({ force: true })
+  await page.locator(`[data-testid="node-${nodeId}"] button[title="Add label (Ctrl+L)"]`).click({ force: true })
   // Scope button click to the node element to avoid matching header buttons
   await page.locator(`[data-testid="node-${nodeId}"]`).getByRole('button', { name: 'Today', exact: true }).click()
   // Close the assigner by pressing Escape
@@ -23,7 +23,7 @@ test.describe('Today label', () => {
 
   test('Today label is visible in label assigner by default', async ({ page }) => {
     await page.locator(`[data-testid="node-${IDS.TASK_A1}"]`).hover()
-    await page.locator(`[data-testid="node-${IDS.TASK_A1}"] button[title="Add label"]`).click({ force: true })
+    await page.locator(`[data-testid="node-${IDS.TASK_A1}"] button[title="Add label (Ctrl+L)"]`).click({ force: true })
     // Today label button should be visible inside the dropdown (scoped to node)
     await expect(
       page.locator(`[data-testid="node-${IDS.TASK_A1}"]`).getByRole('button', { name: 'Today', exact: true })
@@ -66,7 +66,7 @@ test.describe('Today label', () => {
   test("removing Today label via label assigner removes linked copy from Today's Tasks", async ({ page }) => {
     // Open assigner and assign Today label — keep assigner open (no Escape)
     await page.locator(`[data-testid="node-${IDS.TASK_A1}"]`).hover()
-    await page.locator(`[data-testid="node-${IDS.TASK_A1}"] button[title="Add label"]`).click({ force: true })
+    await page.locator(`[data-testid="node-${IDS.TASK_A1}"] button[title="Add label (Ctrl+L)"]`).click({ force: true })
     const todayBtn = page.locator(`[data-testid="node-${IDS.TASK_A1}"]`).getByRole('button', { name: 'Today', exact: true })
     await todayBtn.click()
     await page.waitForTimeout(200)

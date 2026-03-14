@@ -266,7 +266,8 @@ test.describe('Keyboard shortcuts help', () => {
     await page.locator('[data-testid="keyboard-help-btn"]').click()
     const popover = page.locator('[data-testid="keyboard-help-popover"]')
     await expect(popover).toBeVisible()
-    const count = await popover.locator('tr').count()
+    // Visual keyboard modal: count highlighted (active) keys with indigo styling
+    const count = await popover.locator('div.bg-indigo-500').count()
     expect(count).toBeGreaterThanOrEqual(6)
   })
 

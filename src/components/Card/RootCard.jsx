@@ -9,7 +9,10 @@ import NodeContent from '../Node/NodeContent.jsx'
 export default function RootCard({ nodeId }) {
   const node = useStore(s => s.nodes[nodeId])
   const { updateNodeContent, addChildNode, deleteNode, updateNode, dragMode,
-          toggleLabelOnNode, todaysTasksLabelId } = useStore()
+          toggleLabelOnNode, todaysTasksLabelId,
+          collapsedCards, toggleCardCollapse,
+          pinnedCards, toggleCardPin,
+          openDetailsModal } = useStore()
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: nodeId,
@@ -22,6 +25,8 @@ export default function RootCard({ nodeId }) {
   })
 
   const headerRef = useRef(null)
+  const isCollapsed = !!collapsedCards[nodeId]
+  const isPinned = !!pinnedCards[nodeId]
 
   const focusNode = useCallback((targetId) => {
     // Find the contenteditable in a node and focus it
@@ -131,6 +136,43 @@ export default function RootCard({ nodeId }) {
               <circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/>
             </svg>
           </span>
+
+          {/* Pin button */}
+          <button
+            onClick={() => toggleCardPin(nodeId)}
+            className={`flex-shrink-0 transition-colors ${isPinned ? 'text-indigo-400' : 'text-zinc-300 dark:text-zinc-600 hover:text-indigo-400'}`}
+            title={isPinned ? 'Unpin card' : 'Pin card to top'}
+            tabIndex={-1}
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/>
+            </svg>
+          </button>
+
+          {/* Open details button */}
+          <button
+            onClick={() => openDetailsModal(nodeId)}
+            className="flex-shrink-0 text-zinc-300 dark:text-zinc-600 hover:text-zinc-500 dark:hover:text-zinc-400 transition-colors"
+            title="Open details"
+            tabIndex={-1}
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
+            </svg>
+          </button>
+
+          {/* Collapse toggle */}
+          <button
+            onClick={() => toggleCardCollapse(nodeId)}
+            className="flex-shrink-0 text-zinc-300 dark:text-zinc-600 hover:text-zinc-500 dark:hover:text-zinc-400 transition-colors"
+            title={isCollapsed ? 'Expand card' : 'Collapse card'}
+            tabIndex={-1}
+          >
+            <svg className={`w-4 h-4 transition-transform ${isCollapsed ? '-rotate-90' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
           {!isToday && todaysTasksLabelId && (
             <button
               data-testid={`today-toggle-card-${nodeId}`}
@@ -157,41 +199,45 @@ export default function RootCard({ nodeId }) {
         </div>
       </div>
 
-      {/* Card Body */}
-      <div ref={setDropRef} className="px-3 py-2 min-h-[40px]">
-        <SortableContext items={node.childrenIds} strategy={verticalListSortingStrategy}>
-          {node.childrenIds.map(childId => (
-            <NodeItem
-              key={childId}
-              nodeId={childId}
-              parentId={nodeId}
-              depth={0}
-              focusNode={focusNode}
-            />
-          ))}
-        </SortableContext>
+      {/* Card Body — hidden when collapsed */}
+      {!isCollapsed && (
+        <>
+          <div ref={setDropRef} className="px-3 py-2 min-h-[40px]">
+            <SortableContext items={node.childrenIds} strategy={verticalListSortingStrategy}>
+              {node.childrenIds.map(childId => (
+                <NodeItem
+                  key={childId}
+                  nodeId={childId}
+                  parentId={nodeId}
+                  depth={0}
+                  focusNode={focusNode}
+                />
+              ))}
+            </SortableContext>
 
-        {node.childrenIds.length === 0 && (
-          <p className="text-xs text-zinc-300 dark:text-zinc-700 py-1 px-1">
-            {isToday ? 'Drag tasks here or press + to add' : 'Press + to add tasks'}
-          </p>
-        )}
-      </div>
+            {node.childrenIds.length === 0 && (
+              <p className="text-xs text-zinc-300 dark:text-zinc-700 py-1 px-1">
+                {isToday ? 'Drag tasks here or press + to add' : 'Press + to add tasks'}
+              </p>
+            )}
+          </div>
 
-      {/* Add item button */}
-      <div className={`px-4 pb-3 ${dragMode ? 'pointer-events-none' : ''}`}>
-        <button
-          tabIndex={-1}
-          data-testid={`add-item-${nodeId}`}
-          onClick={() => addChildNode(nodeId)}
-          className="flex items-center gap-1.5 text-xs text-zinc-400 dark:text-zinc-600 hover:text-zinc-600 dark:hover:text-zinc-400 transition-colors"
-        >
-          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v14M5 12h14" />
-          </svg>
-          Add item
-        </button>
-      </div>
+          {/* Add item button */}
+          <div className={`px-4 pb-3 ${dragMode ? 'pointer-events-none' : ''}`}>
+            <button
+              tabIndex={-1}
+              data-testid={`add-item-${nodeId}`}
+              onClick={() => addChildNode(nodeId)}
+              className="flex items-center gap-1.5 text-xs text-zinc-400 dark:text-zinc-600 hover:text-zinc-600 dark:hover:text-zinc-400 transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v14M5 12h14" />
+              </svg>
+              Add item
+            </button>
+          </div>
+        </>
+      )}
     </div>
   )
 }

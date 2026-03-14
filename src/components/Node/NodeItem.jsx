@@ -319,7 +319,7 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
             tabIndex={-1}
             onClick={() => toggleNodeType(nodeId)}
             className="p-1 rounded text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700"
-            title={node.type === 'CHECKBOX' ? 'Switch to bullet' : 'Switch to checkbox'}
+            title={node.type === 'CHECKBOX' ? 'Switch to bullet (Space to toggle)' : 'Switch to checkbox (Space to toggle)'}
           >
             {node.type === 'CHECKBOX' ? (
               <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -338,7 +338,7 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
               tabIndex={-1}
               onClick={() => setShowLabelAssigner(v => !v)}
               className="p-1 rounded text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700"
-              title="Add label"
+              title="Add label (Ctrl+L)"
             >
               <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
@@ -354,7 +354,7 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
             tabIndex={-1}
             onClick={() => openDetailsModal(nodeId)}
             className="p-1 rounded text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700"
-            title="Open details"
+            title="Open details (Ctrl+D)"
           >
             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />

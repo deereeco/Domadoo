@@ -9,7 +9,6 @@ import Header from './components/Layout/Header.jsx'
 import FilterBar from './components/Labels/FilterBar.jsx'
 import Board from './components/Board/Board.jsx'
 import DetailsModal from './components/DetailsModal/DetailsModal.jsx'
-import DoneTodayView from './components/DoneTodayView.jsx'
 import LabelManager from './components/Labels/LabelManager.jsx'
 import DayCleanupModal from './components/DayCleanupModal.jsx'
 import DemoModal from './components/DemoModal.jsx'
@@ -21,10 +20,11 @@ function todayString() {
 export default function App() {
   const {
     user, setUser, signOut: storeSignOut, hydrate,
-    detailsModalNodeId, showDoneToday, showLabelManager, theme,
+    detailsModalNodeId, showLabelManager, theme,
     lastCleanupDate, todaysTasksRootId,
     initCleanupDate, runDailyCleanup, seedDemoTodaysTasks,
     pendingCleanupTasks, showDemoModal, setShowDemoModal,
+    dragMode, toggleDragMode,
   } = useStore()
   useDebugConsole()
 
@@ -116,10 +116,26 @@ export default function App() {
 
       {/* Modals */}
       {detailsModalNodeId && <DetailsModal />}
-      {showDoneToday && <DoneTodayView />}
       {showLabelManager && <LabelManager />}
       {pendingCleanupTasks && pendingCleanupTasks.length > 0 && <DayCleanupModal />}
       {showDemoModal && <DemoModal onClose={() => setShowDemoModal(false)} />}
+
+      {/* Floating Drag Mode FAB */}
+      <button
+        data-testid="drag-toggle"
+        onClick={toggleDragMode}
+        className={`fixed bottom-6 left-6 z-40 flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium shadow-lg transition-colors ${
+          dragMode
+            ? 'bg-indigo-500 text-white shadow-indigo-200 dark:shadow-indigo-900'
+            : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700'
+        }`}
+        title="Toggle drag mode"
+      >
+        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M13 6v5h5V6h-5zm-7 0v5h5V6H6zm0 7v5h5v-5H6zm7 0v5h5v-5h-5z"/>
+        </svg>
+        Drag
+      </button>
 
       {/* Hidden debug tap zone — quadruple-tap bottom-right to open Eruda */}
       <div
