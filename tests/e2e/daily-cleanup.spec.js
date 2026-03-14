@@ -76,9 +76,10 @@ test.describe('Daily cleanup', () => {
     const todayCard = page.locator('[data-testid="today-tasks-card"]')
     await expect(todayCard.locator('text=Incomplete Task')).not.toBeVisible()
 
-    // It should appear in history
-    await page.locator('[data-testid="history-btn"]').click()
-    await expect(page.locator('[data-testid="history-list"]').locator('text=Incomplete Task')).toBeVisible()
+    // It should appear in the history board: select yesterday's snapshot from the date dropdown
+    await expect(page.locator('[data-testid="history-date-select"]')).toBeVisible()
+    await page.locator('[data-testid="history-date-select"]').selectOption(isoDate(-1))
+    await expect(page.locator('[data-testid="history-board"]').locator('text=Incomplete Task')).toBeVisible()
   })
 
   // ── Resolve: Push Back ────────────────────────────────────────────────────
@@ -122,7 +123,7 @@ test.describe('Daily cleanup', () => {
     await expect(todayCard.locator('text=Incomplete Task')).toBeVisible()
   })
 
-  // ── History modal ──────────────────────────────────────────────────────────
+  // ── History board ──────────────────────────────────────────────────────────
 
   test('completed tasks appear in History modal after cleanup', async ({ page }) => {
     await setupCleanupState(page)
@@ -134,14 +135,15 @@ test.describe('Daily cleanup', () => {
     await page.locator('[data-testid="cleanup-done-btn"]').click()
     await page.waitForTimeout(300)
 
-    // Open history
-    await page.locator('[data-testid="history-btn"]').click()
-    await expect(page.locator('[data-testid="history-list"]')).toBeVisible()
-    // Yesterday preset is default — the completed task should be visible
-    await expect(page.locator('[data-testid="history-list"]').locator('text=Completed Task')).toBeVisible()
+    // Open history: select yesterday's snapshot from the date dropdown
+    await expect(page.locator('[data-testid="history-date-select"]')).toBeVisible()
+    await page.locator('[data-testid="history-date-select"]').selectOption(isoDate(-1))
+    await expect(page.locator('[data-testid="history-board"]')).toBeVisible()
+    // The completed task should appear in the history board
+    await expect(page.locator('[data-testid="history-board"]').getByText('Completed Task', { exact: true })).toBeVisible()
   })
 
-  test('History filter: Last 7 days shows snapshot', async ({ page }) => {
+  test('History date select shows snapshot from cleanup date', async ({ page }) => {
     await setupCleanupState(page)
     await page.goto('/Domadoo/')
     await page.waitForSelector('[data-testid="board"]')
@@ -150,18 +152,19 @@ test.describe('Daily cleanup', () => {
     await page.locator('[data-testid="cleanup-done-btn"]').click()
     await page.waitForTimeout(300)
 
-    await page.locator('[data-testid="history-btn"]').click()
-    await page.locator('[data-testid="history-preset-week"]').click()
-    await expect(page.locator('[data-testid="history-list"]').locator('text=Completed Task')).toBeVisible()
+    // Select yesterday's snapshot from the date dropdown and verify the task is visible
+    await expect(page.locator('[data-testid="history-date-select"]')).toBeVisible()
+    await page.locator('[data-testid="history-date-select"]').selectOption(isoDate(-1))
+    await expect(page.locator('[data-testid="history-board"]').getByText('Completed Task', { exact: true })).toBeVisible()
   })
 
-  test('History modal shows empty state for period with no completions', async ({ page }) => {
+  test('History date select is not shown when no completions exist', async ({ page }) => {
     await setupMockState(page)
     await page.goto('/Domadoo/')
     await page.waitForSelector('[data-testid="board"]')
 
-    await page.locator('[data-testid="history-btn"]').click()
-    await expect(page.locator('text=No completed tasks found')).toBeVisible()
+    // No history snapshots → date select should not be rendered
+    await expect(page.locator('[data-testid="history-date-select"]')).not.toBeVisible()
   })
 
   // ── ?simulate=nextDay ──────────────────────────────────────────────────────

@@ -53,6 +53,7 @@ export default function FilterBar() {
           <div className="flex items-center gap-1.5 ml-auto">
             <span className="text-xs text-zinc-400 dark:text-zinc-500 font-medium">View:</span>
             <select
+              data-testid="history-date-select"
               value={historyViewDate ?? ''}
               onChange={e => setHistoryViewDate(e.target.value || null)}
               className="text-xs rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer"

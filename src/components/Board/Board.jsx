@@ -37,9 +37,6 @@ export default function Board() {
   const { rootOrder, nodes, addRootNode, moveNode, reorderRootCards, reorderChildren, dragMode, linkToTodaysTasks, todaysTasksRootId, setNestTarget, clearNestTarget, setNestZoneActive, historyViewDate } = useStore()
   useBoardKeyNav()
 
-  // Render history board when a past date is selected
-  if (historyViewDate) return <HistoryBoard />
-
   const [activeDragType, setActiveDragType] = useState(null)
   const nestTimerRef = useRef(null)
   const currentNestOverRef = useRef(null)
@@ -227,6 +224,9 @@ export default function Board() {
       }
     }
   }, [rootOrder, nodes, moveNode, reorderRootCards, reorderChildren, linkToTodaysTasks, todaysTasksRootId, clearNestTarget, setNestZoneActive])
+
+  // Render history board when a past date is selected
+  if (historyViewDate) return <HistoryBoard />
 
   return (
     <DndContext sensors={sensors} collisionDetection={collisionDetection} onDragStart={handleDragStart} onDragEnd={handleDragEnd} measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}>

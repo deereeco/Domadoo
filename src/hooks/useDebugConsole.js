@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, useEffect } from 'react'
 
 const TAP_COUNT = 4
 const TAP_WINDOW_MS = 800
@@ -7,18 +7,25 @@ export function useDebugConsole() {
   const taps = useRef([])
   const initialized = useRef(false)
 
-  const handleTap = () => {
-    const now = Date.now()
-    taps.current = [...taps.current, now].filter(t => now - t < TAP_WINDOW_MS)
+  useEffect(() => {
+    const handler = (e) => {
+      const inZone =
+        e.clientX > window.innerWidth - 64 &&
+        e.clientY > window.innerHeight - 64
+      if (!inZone) return
 
-    if (taps.current.length >= TAP_COUNT && !initialized.current) {
-      initialized.current = true
-      import('eruda').then(({ default: eruda }) => {
-        eruda.init()
-        eruda.show()
-      })
+      const now = Date.now()
+      taps.current = [...taps.current, now].filter(t => now - t < TAP_WINDOW_MS)
+
+      if (taps.current.length >= TAP_COUNT && !initialized.current) {
+        initialized.current = true
+        import('eruda').then(({ default: eruda }) => {
+          eruda.init()
+          eruda.show()
+        })
+      }
     }
-  }
-
-  return handleTap
+    document.addEventListener('pointerdown', handler)
+    return () => document.removeEventListener('pointerdown', handler)
+  }, [])
 }

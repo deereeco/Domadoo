@@ -26,7 +26,7 @@ export default function App() {
     initCleanupDate, runDailyCleanup, seedDemoTodaysTasks,
     pendingCleanupTasks, showDemoModal, setShowDemoModal,
   } = useStore()
-  const handleDebugTap = useDebugConsole()
+  useDebugConsole()
 
   // Apply saved theme on mount
   useEffect(() => {
@@ -101,8 +101,7 @@ export default function App() {
       <>
         <SignIn />
         <div
-          onPointerDown={handleDebugTap}
-          className="fixed bottom-0 right-0 w-16 h-16 z-50"
+          className="fixed bottom-0 right-0 w-16 h-16 z-50 pointer-events-none"
           aria-hidden="true"
         />
       </>
@@ -124,8 +123,7 @@ export default function App() {
 
       {/* Hidden debug tap zone — quadruple-tap bottom-right to open Eruda */}
       <div
-        onPointerDown={handleDebugTap}
-        className="fixed bottom-0 right-0 w-16 h-16 z-50"
+        className="fixed bottom-0 right-0 w-16 h-16 z-50 pointer-events-none"
         aria-hidden="true"
       />
     </div>
