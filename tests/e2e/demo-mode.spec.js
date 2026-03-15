@@ -1,6 +1,10 @@
 import { test, expect } from '@playwright/test'
 import { setupMockState, setupDemoModeState, IDS } from './helpers/mockState.js'
 
+async function openSettings(page) {
+  await page.locator('[data-testid="settings-btn"]').click()
+}
+
 test.describe('Demo mode', () => {
   // ── Modal opens correctly ────────────────────────────────────────────────────
 
@@ -9,6 +13,7 @@ test.describe('Demo mode', () => {
     await page.goto('/Domadoo/')
     await page.waitForSelector('[data-testid="board"]')
 
+    await openSettings(page)
     await page.locator('[data-testid="demo-btn"]').click()
     await expect(page.locator('[data-testid="demo-modal"]')).toBeVisible()
     // Old dropdown items should not exist
@@ -21,6 +26,7 @@ test.describe('Demo mode', () => {
     await page.goto('/Domadoo/')
     await page.waitForSelector('[data-testid="board"]')
 
+    await openSettings(page)
     await page.locator('[data-testid="demo-btn"]').click()
     await expect(page.locator('[data-testid="enter-demo-btn"]')).toBeVisible()
     await expect(page.locator('[data-testid="exit-demo-btn"]')).not.toBeVisible()
@@ -31,6 +37,7 @@ test.describe('Demo mode', () => {
     await page.goto('/Domadoo/')
     await page.waitForSelector('[data-testid="board"]')
 
+    await openSettings(page)
     await page.locator('[data-testid="demo-btn"]').click()
     await expect(page.locator('[data-testid="demo-modal"]')).toBeVisible()
     await page.keyboard.press('Escape')
@@ -42,6 +49,7 @@ test.describe('Demo mode', () => {
     await page.goto('/Domadoo/')
     await page.waitForSelector('[data-testid="board"]')
 
+    await openSettings(page)
     await page.locator('[data-testid="demo-btn"]').click()
     await expect(page.locator('[data-testid="demo-modal"]')).toBeVisible()
     // Click the backdrop (the outer fixed div)
@@ -60,6 +68,7 @@ test.describe('Demo mode', () => {
     await expect(page.locator('text=Card A')).toBeVisible()
 
     // Enter demo mode
+    await openSettings(page)
     await page.locator('[data-testid="demo-btn"]').click()
     await page.locator('[data-testid="enter-demo-btn"]').click()
     await page.waitForTimeout(300)
@@ -76,10 +85,13 @@ test.describe('Demo mode', () => {
     await page.goto('/Domadoo/')
     await page.waitForSelector('[data-testid="board"]')
 
+    await openSettings(page)
     await page.locator('[data-testid="demo-btn"]').click()
     await page.locator('[data-testid="enter-demo-btn"]').click()
     await page.waitForTimeout(300)
 
+    // Open settings to inspect the demo-btn state
+    await openSettings(page)
     const demoBtn = page.locator('[data-testid="demo-btn"]')
     await expect(demoBtn).toHaveText('Demo ●')
     await expect(demoBtn).toHaveClass(/amber/)
@@ -92,6 +104,7 @@ test.describe('Demo mode', () => {
     await page.goto('/Domadoo/')
     await page.waitForSelector('[data-testid="board"]')
 
+    await openSettings(page)
     await page.locator('[data-testid="demo-btn"]').click()
     await expect(page.locator('[data-testid="exit-demo-btn"]')).toBeVisible()
     await expect(page.locator('[data-testid="demo-scenario-nextday"]')).toBeVisible()
@@ -109,6 +122,7 @@ test.describe('Demo mode', () => {
     await expect(page.locator('text=Card A')).not.toBeVisible()
 
     // Exit demo mode
+    await openSettings(page)
     await page.locator('[data-testid="demo-btn"]').click()
     await page.locator('[data-testid="exit-demo-btn"]').click()
     await page.waitForTimeout(300)
@@ -116,7 +130,8 @@ test.describe('Demo mode', () => {
     // Real tasks restored
     await expect(page.locator('text=Card A')).toBeVisible()
     await expect(page.locator('text=Card B')).toBeVisible()
-    // Demo indicator gone
+    // Demo indicator gone — open settings to check
+    await openSettings(page)
     await expect(page.locator('[data-testid="demo-btn"]')).toHaveText('Demo')
   })
 
@@ -127,14 +142,17 @@ test.describe('Demo mode', () => {
     await page.goto('/Domadoo/')
     await page.waitForSelector('[data-testid="board"]')
 
-    // Verify in demo mode
+    // Verify in demo mode — open settings to check
+    await openSettings(page)
     await expect(page.locator('[data-testid="demo-btn"]')).toHaveText('Demo ●')
+    await page.keyboard.press('Escape')
 
     // Refresh the page
     await page.reload()
     await page.waitForSelector('[data-testid="board"]')
 
-    // Still in demo mode after refresh
+    // Still in demo mode after refresh — open settings to check
+    await openSettings(page)
     await expect(page.locator('[data-testid="demo-btn"]')).toHaveText('Demo ●')
     // Can still exit
     await page.locator('[data-testid="demo-btn"]').click()
@@ -150,6 +168,7 @@ test.describe('Demo mode', () => {
     await page.waitForSelector('[data-testid="board"]')
 
     // Exit demo mode after refresh
+    await openSettings(page)
     await page.locator('[data-testid="demo-btn"]').click()
     await page.locator('[data-testid="exit-demo-btn"]').click()
     await page.waitForTimeout(300)

@@ -258,11 +258,12 @@ test.describe('Ctrl+Shift+N — new card', () => {
 // ─── ? keyboard help ──────────────────────────────────────────────────────
 
 test.describe('Keyboard shortcuts help', () => {
-  test('? button is visible in header', async ({ page }) => {
-    await expect(page.locator('[data-testid="keyboard-help-btn"]')).toBeVisible()
+  test('settings gear button is visible in header', async ({ page }) => {
+    await expect(page.locator('[data-testid="settings-btn"]')).toBeVisible()
   })
 
-  test('clicking ? opens shortcut popover with at least 6 shortcuts', async ({ page }) => {
+  test('clicking ? in settings opens shortcut popover with at least 6 shortcuts', async ({ page }) => {
+    await page.locator('[data-testid="settings-btn"]').click()
     await page.locator('[data-testid="keyboard-help-btn"]').click()
     const popover = page.locator('[data-testid="keyboard-help-popover"]')
     await expect(popover).toBeVisible()
@@ -272,6 +273,7 @@ test.describe('Keyboard shortcuts help', () => {
   })
 
   test('Escape closes the shortcut popover', async ({ page }) => {
+    await page.locator('[data-testid="settings-btn"]').click()
     await page.locator('[data-testid="keyboard-help-btn"]').click()
     const popover = page.locator('[data-testid="keyboard-help-popover"]')
     await expect(popover).toBeVisible()

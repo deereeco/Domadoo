@@ -1,19 +1,34 @@
-import { useState } from 'react'
-import ThemeToggle from './ThemeToggle.jsx'
+import { useState, useRef, useEffect } from 'react'
 import KeyboardShortcutsHelp from '../UI/KeyboardShortcutsHelp.jsx'
 import { useStore } from '../../store/useStore.js'
 import { signOut } from '../../services/googleAuth.js'
 import { version } from '../../../package.json'
 
 export default function Header() {
-  const { user, syncStatus, addRootNode, signOut: storeSignOut, isDemoMode, setShowDemoModal } = useStore()
+  const { user, syncStatus, addRootNode, signOut: storeSignOut, isDemoMode, setShowDemoModal, theme, toggleTheme } = useStore()
   const [showHelp, setShowHelp] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
   const [avatarError, setAvatarError] = useState(false)
+  const settingsRef = useRef(null)
 
   const handleSignOut = () => {
     signOut()
     storeSignOut()
   }
+
+  useEffect(() => {
+    if (!showSettings) return
+    const handleClick = (e) => {
+      if (settingsRef.current && !settingsRef.current.contains(e.target)) setShowSettings(false)
+    }
+    const handleKey = (e) => { if (e.key === 'Escape') setShowSettings(false) }
+    document.addEventListener('mousedown', handleClick)
+    document.addEventListener('keydown', handleKey)
+    return () => {
+      document.removeEventListener('mousedown', handleClick)
+      document.removeEventListener('keydown', handleKey)
+    }
+  }, [showSettings])
 
   return (
     <header className="sticky top-0 z-40 bg-zinc-50/80 dark:bg-zinc-900/80 backdrop-blur border-b border-zinc-200 dark:border-zinc-800">
@@ -49,32 +64,58 @@ export default function Header() {
 
         {/* Right: actions */}
         <div className="flex items-center gap-1 justify-end">
-          <button
-            data-testid="demo-btn"
-            onClick={() => setShowDemoModal(true)}
-            className={`px-2 py-1.5 text-xs rounded-lg font-medium transition-colors ${
-              isDemoMode
-                ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400'
-                : 'text-zinc-400 dark:text-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-800'
-            }`}
-            title={isDemoMode ? 'Demo mode active' : 'Demo scenarios'}
-          >
-            {isDemoMode ? 'Demo ●' : 'Demo'}
-          </button>
-
-          <div className="relative">
+          {/* Settings gear */}
+          <div className="relative" ref={settingsRef}>
             <button
-              data-testid="keyboard-help-btn"
-              onClick={() => setShowHelp(v => !v)}
-              className="px-2 py-1.5 text-xs rounded-lg font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-              title="Keyboard shortcuts"
+              data-testid="settings-btn"
+              onClick={() => setShowSettings(v => !v)}
+              className={`p-2 rounded-lg transition-colors ${
+                showSettings
+                  ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200'
+                  : 'text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+              }`}
+              title="Settings"
             >
-              ?
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
             </button>
-            {showHelp && <KeyboardShortcutsHelp onClose={() => setShowHelp(false)} />}
+
+            {showSettings && (
+              <div className="absolute right-0 top-full mt-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-lg py-1 min-w-[160px] z-50">
+                <button
+                  data-testid="demo-btn"
+                  onClick={() => { setShowSettings(false); setShowDemoModal(true) }}
+                  className={`w-full text-left px-3 py-2 text-sm transition-colors ${
+                    isDemoMode
+                      ? 'text-amber-600 dark:text-amber-400 font-medium'
+                      : 'text-zinc-700 dark:text-zinc-200'
+                  } hover:bg-zinc-50 dark:hover:bg-zinc-700`}
+                >
+                  {isDemoMode ? 'Demo ●' : 'Demo'}
+                </button>
+
+                <button
+                  data-testid="keyboard-help-btn"
+                  onClick={() => { setShowSettings(false); setShowHelp(true) }}
+                  className="w-full text-left px-3 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
+                >
+                  ? Shortcuts
+                </button>
+
+                <button
+                  onClick={toggleTheme}
+                  className="w-full text-left px-3 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
+                >
+                  {theme === 'dark' ? '☀ Light mode' : '🌙 Dark mode'}
+                </button>
+              </div>
+            )}
           </div>
 
-          <ThemeToggle />
+          {showHelp && <KeyboardShortcutsHelp onClose={() => setShowHelp(false)} />}
 
           {user && (
             <div className="relative group ml-1">
