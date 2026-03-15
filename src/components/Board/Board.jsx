@@ -97,16 +97,23 @@ export default function Board() {
     const vv = window.visualViewport
     if (!vv) return
     const check = () => setIsZoomed(vv.scale > 1.05)
+    check()
     vv.addEventListener('resize', check)
-    return () => vv.removeEventListener('resize', check)
+    vv.addEventListener('scroll', check)
+    return () => {
+      vv.removeEventListener('resize', check)
+      vv.removeEventListener('scroll', check)
+    }
   }, [])
 
   const resetZoom = useCallback(() => {
     const meta = document.querySelector('meta[name="viewport"]')
     if (!meta) return
     const orig = meta.content
-    meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0'
-    setTimeout(() => { meta.content = orig }, 300)
+    meta.content = 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no'
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => { meta.content = orig })
+    })
   }, [])
 
   const handleBgTap = useCallback((e) => {
@@ -242,7 +249,7 @@ export default function Board() {
           Reset zoom
         </button>
       )}
-      <div data-testid="board" onClick={handleBgTap} className="max-w-screen-xl mx-auto px-4 py-6">
+      <div data-testid="board" onClick={handleBgTap} className="touch-manipulation max-w-screen-xl mx-auto px-4 py-6">
 
         {/* Pinned section */}
         {pinnedIds.length > 0 && (
