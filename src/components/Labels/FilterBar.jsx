@@ -1,5 +1,6 @@
 import { useStore } from '../../store/useStore.js'
 import { formatSnapshotDateLabel, formatSnapshotCardTitle } from '../../utils/snapshotToNodes.js'
+import { UNLABELED_FILTER_ID } from '../../hooks/useNodeVisibility.js'
 
 export default function FilterBar() {
   const {
@@ -59,39 +60,41 @@ export default function FilterBar() {
           Tomorrow's Tasks
         </button>
 
-        {usedLabels.length > 0 && (
-          <>
-            <span className="text-zinc-200 dark:text-zinc-700 mx-1 select-none">|</span>
-            <span className="text-xs text-zinc-400 dark:text-zinc-500 font-medium mr-1">Filter:</span>
-            {usedLabels.map(label => {
-              const mode = activeFilters[label.id] ?? null
-              return (
-                <FilterChip
-                  key={label.id}
-                  label={label}
-                  mode={mode}
-                  onToggle={(nextMode) => setFilter(label.id, nextMode)}
-                  data-testid={`filter-chip-${label.name.toLowerCase()}`}
-                />
-              )
-            })}
-            {hasActiveFilters && (
-              <button
-                data-testid="filter-clear"
-                onClick={clearFilters}
-                className="text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 px-2 py-0.5"
-              >
-                Clear
-              </button>
-            )}
-          </>
-        )}
+        <>
+          <span className="text-zinc-200 dark:text-zinc-700 mx-1 select-none">|</span>
+          <span className="text-xs text-zinc-400 dark:text-zinc-500 font-medium mr-1">Filter:</span>
+          <FilterChip
+            label={{ id: UNLABELED_FILTER_ID, name: 'Unlabeled', color: '#71717a' }}
+            mode={activeFilters[UNLABELED_FILTER_ID] ?? null}
+            onToggle={(nextMode) => setFilter(UNLABELED_FILTER_ID, nextMode)}
+            data-testid="filter-chip-unlabeled"
+          />
+          {usedLabels.map(label => {
+            const mode = activeFilters[label.id] ?? null
+            return (
+              <FilterChip
+                key={label.id}
+                label={label}
+                mode={mode}
+                onToggle={(nextMode) => setFilter(label.id, nextMode)}
+                data-testid={`filter-chip-${label.name.toLowerCase()}`}
+              />
+            )
+          })}
+          {hasActiveFilters && (
+            <button
+              data-testid="filter-clear"
+              onClick={clearFilters}
+              className="text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 px-2 py-0.5"
+            >
+              Clear
+            </button>
+          )}
+        </>
 
         {sortedHistory.length > 0 && (
           <div className="flex items-center gap-1.5 ml-auto">
-            {usedLabels.length > 0 && (
-              <span className="text-zinc-200 dark:text-zinc-700 mx-1 select-none">|</span>
-            )}
+            <span className="text-zinc-200 dark:text-zinc-700 mx-1 select-none">|</span>
             <span className="text-xs text-zinc-400 dark:text-zinc-500 font-medium">View:</span>
             <select
               data-testid="history-date-select"

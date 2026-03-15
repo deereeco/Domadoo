@@ -17,13 +17,14 @@ test.describe('Filter bar visibility', () => {
     await expect(page.locator(PERSONAL_CHIP)).toBeVisible()
   })
 
-  test('no filter chips shown when no labels are used', async ({ page }) => {
+  test('unlabeled chip is always visible even when no label chips exist', async ({ page }) => {
     await setupMockState(page)
     await page.goto('/Domadoo/')
     await page.waitForSelector('[data-testid="board"]')
 
-    // MOCK_STATE has no labels assigned to nodes, so no chips should appear
-    await expect(page.locator('text=Filter:')).not.toBeVisible()
+    // MOCK_STATE has no labels assigned to nodes, so only the unlabeled chip should appear
+    await expect(page.locator('[data-testid="filter-chip-unlabeled"]')).toBeVisible()
+    await expect(page.locator(WORK_CHIP)).not.toBeVisible()
   })
 })
 
@@ -180,5 +181,59 @@ test.describe('Mode cycling', () => {
       await expect(page.locator('[data-testid="board"]')).toBeVisible()
       await expect(page.locator('[data-testid="card-list"]')).toBeVisible()
     }
+  })
+})
+
+// ── Unlabeled filter ──────────────────────────────────────────────────────────
+
+const UNLABELED_CHIP = '[data-testid="filter-chip-unlabeled"]'
+
+test.describe('Unlabeled filter', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupFilterState(page)
+    await page.goto('/Domadoo/')
+    await page.waitForSelector('[data-testid="board"]')
+  })
+
+  test('unlabeled chip is always visible in filter bar', async ({ page }) => {
+    await expect(page.locator(UNLABELED_CHIP)).toBeVisible()
+  })
+
+  test('unlabeled chip appears before label chips', async ({ page }) => {
+    const unlabeledBox = await page.locator(UNLABELED_CHIP).boundingBox()
+    const workBox = await page.locator(WORK_CHIP).boundingBox()
+    expect(unlabeledBox.x).toBeLessThan(workBox.x)
+  })
+
+  test('clicking once enters show mode and shows only unlabeled nodes', async ({ page }) => {
+    await page.locator(UNLABELED_CHIP).click()
+    await page.waitForTimeout(200)
+
+    await expect(page.locator('[data-testid="filter-chip-unlabeled-badge"]')).toHaveText('show')
+    await expect(page.locator(`[data-testid="node-${IDS.FILTER_TASK_UNLABELED}"]`)).toBeVisible()
+    await expect(page.locator(`[data-testid="node-${IDS.FILTER_TASK_WORK_1}"]`)).not.toBeVisible()
+    await expect(page.locator(`[data-testid="node-${IDS.FILTER_TASK_PERSONAL}"]`)).not.toBeVisible()
+  })
+
+  test('clicking twice enters hide mode and hides unlabeled nodes', async ({ page }) => {
+    await page.locator(UNLABELED_CHIP).click()
+    await page.locator(UNLABELED_CHIP).click()
+    await page.waitForTimeout(200)
+
+    await expect(page.locator('[data-testid="filter-chip-unlabeled-badge"]')).toHaveText('hide')
+    await expect(page.locator(`[data-testid="node-${IDS.FILTER_TASK_UNLABELED}"]`)).not.toBeVisible()
+    await expect(page.locator(`[data-testid="node-${IDS.FILTER_TASK_WORK_1}"]`)).toBeVisible()
+    await expect(page.locator(`[data-testid="node-${IDS.FILTER_TASK_PERSONAL}"]`)).toBeVisible()
+  })
+
+  test('clicking three times clears the filter', async ({ page }) => {
+    await page.locator(UNLABELED_CHIP).click()
+    await page.locator(UNLABELED_CHIP).click()
+    await page.locator(UNLABELED_CHIP).click()
+    await page.waitForTimeout(200)
+
+    await expect(page.locator('[data-testid="filter-chip-unlabeled-badge"]')).not.toBeVisible()
+    await expect(page.locator(`[data-testid="node-${IDS.FILTER_TASK_UNLABELED}"]`)).toBeVisible()
+    await expect(page.locator(`[data-testid="node-${IDS.FILTER_TASK_WORK_1}"]`)).toBeVisible()
   })
 })

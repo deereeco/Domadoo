@@ -1,16 +1,22 @@
 import { useMemo } from 'react'
 import { useStore } from '../store/useStore.js'
 
+export const UNLABELED_FILTER_ID = '__unlabeled__'
+
 function hasActiveFilters(activeFilters) {
   return Object.values(activeFilters).some(v => v !== null)
 }
 
 function nodeMatchesShowFilter(node, showLabels) {
-  return showLabels.some(lid => node.labelIds.includes(lid))
+  return showLabels.some(lid =>
+    lid === UNLABELED_FILTER_ID ? node.labelIds.length === 0 : node.labelIds.includes(lid)
+  )
 }
 
 function nodeMatchesHideFilter(node, hideLabels) {
-  return hideLabels.some(lid => node.labelIds.includes(lid))
+  return hideLabels.some(lid =>
+    lid === UNLABELED_FILTER_ID ? node.labelIds.length === 0 : node.labelIds.includes(lid)
+  )
 }
 
 function subtreeMatchesShow(nodeId, nodes, showLabels) {
