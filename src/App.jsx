@@ -49,22 +49,28 @@ export default function App() {
     runDailyCleanup()
   }, [])
 
-  // Daily cleanup check on mount and when tab regains focus
-  useEffect(() => {
-    const check = () => {
-      const state = useStore.getState()
-      const today = todayString()
-      if (!state.lastCleanupDate) {
-        state.initCleanupDate(today)
-        return
-      }
-      if (state.lastCleanupDate !== today && (state.todaysTasksRootId || state.tomorrowsTasksRootId)) {
-        state.runDailyCleanup()
-      }
+  // Daily cleanup check — extracted so it can be called after Drive hydration too
+  const runCleanupCheck = () => {
+    const state = useStore.getState()
+    const today = todayString()
+    if (!state.lastCleanupDate) {
+      state.initCleanupDate(today)
+      return
     }
-    check()
-    document.addEventListener('visibilitychange', check)
-    return () => document.removeEventListener('visibilitychange', check)
+    if (state.lastCleanupDate !== today && (state.todaysTasksRootId || state.tomorrowsTasksRootId)) {
+      state.runDailyCleanup()
+    }
+  }
+
+  // Run on mount, tab focus, and BFCache restore (pageshow covers mobile back-navigation)
+  useEffect(() => {
+    runCleanupCheck()
+    document.addEventListener('visibilitychange', runCleanupCheck)
+    window.addEventListener('pageshow', runCleanupCheck)
+    return () => {
+      document.removeEventListener('visibilitychange', runCleanupCheck)
+      window.removeEventListener('pageshow', runCleanupCheck)
+    }
   }, [])
 
   // Initialize Google auth client and attempt silent re-auth if user is persisted
@@ -78,6 +84,7 @@ export default function App() {
         const driveData = await loadFromDrive()
         if (driveData) hydrate(driveData)
         setUser(userInfo)
+        runCleanupCheck()
       },
       onError: (err) => {
         console.warn('[auth] silent re-auth failed:', err, '→ signing out')
