@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
+import { flushSync } from 'react-dom'
 import { useSortable, SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { useDroppable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
@@ -172,14 +173,11 @@ export default function RootCard({ nodeId }) {
                 }
                 if (e.key === 'Enter') {
                   e.preventDefault()
-                  e.currentTarget.blur()
-                  headerRef.current?.focus()
-                  if (node.childrenIds.length > 0) {
-                    focusNode(node.childrenIds[0])
-                  } else {
-                    const newId = addChildNode(nodeId)
-                    setTimeout(() => focusNode(newId), 50)
-                  }
+                  const targetId = node.childrenIds.length > 0
+                    ? node.childrenIds[0]
+                    : (() => { let id; flushSync(() => { id = addChildNode(nodeId) }); return id })()
+                  const el = document.querySelector(`[data-nodeid="${targetId}"] [contenteditable]`)
+                  if (el) { el.focus(); const r = document.createRange(); r.selectNodeContents(el); r.collapse(false); const s = window.getSelection(); s.removeAllRanges(); s.addRange(r) }
                 }
                 if (e.key === 'Backspace' && e.currentTarget.textContent === '') {
                   e.preventDefault()
