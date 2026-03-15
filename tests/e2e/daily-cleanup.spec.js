@@ -29,12 +29,15 @@ test.describe('Daily cleanup', () => {
     await expect(page.locator('[data-testid="cleanup-task-list"]').locator('text=Incomplete Task')).toBeVisible()
   })
 
-  test('completed tasks are silently archived without appearing in modal', async ({ page }) => {
+  test('completed tasks appear in modal so user can choose to repeat or remove them', async ({ page }) => {
     await setupCleanupState(page)
     await page.goto('/Domadoo/')
     await page.waitForSelector('[data-testid="board"]')
-    // Completed Task should NOT appear in cleanup modal (it was archived silently)
-    await expect(page.locator('[data-testid="cleanup-done-btn"]').locator('..').locator('text=Completed Task')).not.toBeVisible()
+    // Completed Task SHOULD appear in cleanup modal (user decides what to do with it)
+    await expect(page.locator('[data-testid="cleanup-task-list"]').locator('text=Completed Task')).toBeVisible()
+    // Repeat and Remove buttons should be present for the completed task
+    await expect(page.locator(`[data-testid="cleanup-action-repeat-${IDS.TODAY_COMPLETED}"]`)).toBeVisible()
+    await expect(page.locator(`[data-testid="cleanup-action-remove-${IDS.TODAY_COMPLETED}"]`)).toBeVisible()
   })
 
   // ── Resolve: Move to Today ─────────────────────────────────────────────────
@@ -46,6 +49,8 @@ test.describe('Daily cleanup', () => {
 
     // Click "→ Today" for the incomplete task
     await page.locator(`[data-testid="cleanup-action-today-${IDS.TODAY_INCOMPLETE}"]`).click()
+    // Also resolve the completed task (remove it)
+    await page.locator(`[data-testid="cleanup-action-remove-${IDS.TODAY_COMPLETED}"]`).click()
     // Done button should now be enabled — click it
     await page.locator('[data-testid="cleanup-done-btn"]').click()
     await page.waitForTimeout(300)
@@ -66,6 +71,8 @@ test.describe('Daily cleanup', () => {
     await page.waitForSelector('[data-testid="board"]')
 
     await page.locator(`[data-testid="cleanup-action-complete-${IDS.TODAY_INCOMPLETE}"]`).click()
+    // Also resolve the completed task
+    await page.locator(`[data-testid="cleanup-action-remove-${IDS.TODAY_COMPLETED}"]`).click()
     await page.locator('[data-testid="cleanup-done-btn"]').click()
     await page.waitForTimeout(300)
 
@@ -90,6 +97,8 @@ test.describe('Daily cleanup', () => {
     await page.waitForSelector('[data-testid="board"]')
 
     await page.locator(`[data-testid="cleanup-action-pushback-${IDS.TODAY_INCOMPLETE}"]`).click()
+    // Also resolve the completed task
+    await page.locator(`[data-testid="cleanup-action-remove-${IDS.TODAY_COMPLETED}"]`).click()
     await page.locator('[data-testid="cleanup-done-btn"]').click()
     await page.waitForTimeout(300)
 
@@ -107,12 +116,13 @@ test.describe('Daily cleanup', () => {
 
   // ── Apply All ─────────────────────────────────────────────────────────────
 
-  test('"All → Today" bulk button resolves all tasks as today', async ({ page }) => {
+  test('"All → Today" + "All ↺ Repeat" bulk buttons resolve all tasks', async ({ page }) => {
     await setupCleanupState(page)
     await page.goto('/Domadoo/')
     await page.waitForSelector('[data-testid="board"]')
 
     await page.getByText('All → Today').click()
+    await page.getByText('All ↺ Repeat').click()
     // Done button should now be enabled
     await expect(page.locator('[data-testid="cleanup-done-btn"]')).toBeEnabled()
     await page.locator('[data-testid="cleanup-done-btn"]').click()
@@ -130,8 +140,9 @@ test.describe('Daily cleanup', () => {
     await page.goto('/Domadoo/')
     await page.waitForSelector('[data-testid="board"]')
 
-    // Resolve the incomplete task so modal closes
+    // Resolve all tasks so modal closes (incomplete → Today, completed → Remove)
     await page.getByText('All → Today').click()
+    await page.getByText('All ✓ Remove').click()
     await page.locator('[data-testid="cleanup-done-btn"]').click()
     await page.waitForTimeout(300)
 
@@ -149,6 +160,7 @@ test.describe('Daily cleanup', () => {
     await page.waitForSelector('[data-testid="board"]')
 
     await page.getByText('All → Today').click()
+    await page.getByText('All ✓ Remove').click()
     await page.locator('[data-testid="cleanup-done-btn"]').click()
     await page.waitForTimeout(300)
 
