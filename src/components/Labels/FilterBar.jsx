@@ -29,6 +29,7 @@ export default function FilterBar() {
         <button
           onClick={() => setShowLabelManager(true)}
           className="px-2.5 py-1 text-xs rounded-lg font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors border border-zinc-200 dark:border-zinc-700"
+          style={{ touchAction: 'manipulation' }}
         >
           Labels
         </button>
@@ -42,6 +43,7 @@ export default function FilterBar() {
               : 'text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 border-zinc-200 dark:border-zinc-700'
           }`}
           title={todaysTasksVisible ? "Hide Today's Tasks card" : "Show Today's Tasks card"}
+          style={{ touchAction: 'manipulation' }}
         >
           Today's Tasks
         </button>
@@ -56,6 +58,7 @@ export default function FilterBar() {
               : 'text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 border-zinc-200 dark:border-zinc-700'
           }`}
           title={tomorrowsTasksVisible ? "Hide Tomorrow's Tasks card" : "Show Tomorrow's Tasks card"}
+          style={{ touchAction: 'manipulation' }}
         >
           Tomorrow's Tasks
         </button>
@@ -86,6 +89,7 @@ export default function FilterBar() {
               data-testid="filter-clear"
               onClick={clearFilters}
               className="text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 px-2 py-0.5"
+              style={{ touchAction: 'manipulation' }}
             >
               Clear
             </button>
@@ -101,6 +105,7 @@ export default function FilterBar() {
               value={historyViewDate ?? ''}
               onChange={e => setHistoryViewDate(e.target.value || null)}
               className="text-xs rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer"
+              style={{ fontSize: '16px', touchAction: 'manipulation' }}
             >
               <option value="">Today</option>
               {sortedHistory.map(snap => (
@@ -138,7 +143,7 @@ function FilterChip({ label, mode, onToggle, 'data-testid': testId }) {
       <span
         data-testid={testId}
         className={`${baseStyle} ring-2`}
-        style={{ backgroundColor: label.color + '22', color: label.color, ringColor: label.color }}
+        style={{ backgroundColor: label.color + '22', color: label.color, ringColor: label.color, touchAction: 'manipulation' }}
         onClick={cycleMode}
         title="Showing — click to hide"
       >
@@ -154,6 +159,7 @@ function FilterChip({ label, mode, onToggle, 'data-testid': testId }) {
       <span
         data-testid={testId}
         className={`${baseStyle} line-through opacity-60 bg-zinc-100 dark:bg-zinc-800 text-zinc-400`}
+        style={{ touchAction: 'manipulation' }}
         onClick={cycleMode}
         title="Hidden — click to clear"
       >
@@ -167,6 +173,7 @@ function FilterChip({ label, mode, onToggle, 'data-testid': testId }) {
     <span
       data-testid={testId}
       className={`${baseStyle} bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700`}
+      style={{ touchAction: 'manipulation' }}
       onClick={cycleMode}
       title="Click to show only this label"
     >

@@ -40,7 +40,7 @@ export default function LabelManager() {
           </button>
         </div>
 
-        <div className="p-6 space-y-4 max-h-96 overflow-y-auto">
+        <div className="p-6 space-y-4 max-h-[80dvh] overflow-y-auto">
           {/* Create new */}
           <div className="flex items-center gap-2">
             <input
@@ -49,6 +49,7 @@ export default function LabelManager() {
               onKeyDown={e => e.key === 'Enter' && handleCreate()}
               placeholder="New label name…"
               className="flex-1 text-sm px-3 py-2 rounded-lg bg-zinc-100 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-200 placeholder-zinc-400 outline-none"
+              style={{ fontSize: '16px' }}
             />
             <div className="flex gap-1 flex-wrap w-24">
               {PRESET_COLORS.map(c => (
@@ -58,7 +59,7 @@ export default function LabelManager() {
                   className={`w-5 h-5 rounded-full border-2 transition-transform ${
                     newColor === c ? 'border-zinc-900 dark:border-white scale-110' : 'border-transparent'
                   }`}
-                  style={{ backgroundColor: c }}
+                  style={{ backgroundColor: c, touchAction: 'manipulation' }}
                 />
               ))}
             </div>
@@ -114,6 +115,7 @@ function LabelRow({ label, isEditing, onEdit, onSave, onDelete, onCancel }) {
           value={name}
           onChange={e => setName(e.target.value)}
           className="flex-1 text-sm px-2 py-1 rounded bg-white dark:bg-zinc-700 text-zinc-700 dark:text-zinc-200 outline-none border border-zinc-200 dark:border-zinc-600"
+          style={{ fontSize: '16px' }}
         />
         <div className="flex gap-1">
           {PRESET_COLORS.map(c => (
@@ -121,7 +123,7 @@ function LabelRow({ label, isEditing, onEdit, onSave, onDelete, onCancel }) {
               key={c}
               onClick={() => setColor(c)}
               className={`w-4 h-4 rounded-full border-2 ${color === c ? 'border-zinc-900 dark:border-white' : 'border-transparent'}`}
-              style={{ backgroundColor: c }}
+              style={{ backgroundColor: c, touchAction: 'manipulation' }}
             />
           ))}
         </div>
