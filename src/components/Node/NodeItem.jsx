@@ -157,30 +157,6 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
     if (el) { el.focus(); const range = document.createRange(); range.selectNodeContents(el); range.collapse(false); const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range) }
   }, [])
 
-  if (!node || !vis.visible) return null
-
-  const isCompleted = node.status === 'COMPLETED'
-  const hasChildren = node.childrenIds.length > 0
-  const nodeLabels = node.labelIds.map(id => labels[id]).filter(Boolean)
-
-  // Today's Tasks linking
-  const hasTodaysCopy = node.linkedNodeIds.some(lid => nodes[lid]?.isTodaysTask)
-  const isTodaysCopy = node.isTodaysTask && node.linkedNodeIds.length > 0 && node.id !== todaysTasksRootId
-  const canAddToToday = todaysTasksRootId && !node.isTodaysTask && !node.isTomorrowsTask && !hasTodaysCopy
-
-  // Tomorrow's Tasks linking
-  const hasTomorrowCopy = node.linkedNodeIds.some(lid => nodes[lid]?.isTomorrowsTask)
-  const isTomorrowsCopy = node.isTomorrowsTask && node.linkedNodeIds.length > 0 && node.id !== tomorrowsTasksRootId
-  const canAddToTomorrow = tomorrowsTasksRootId && !node.isTodaysTask && !node.isTomorrowsTask && !hasTomorrowCopy && !hasTodaysCopy
-
-  const hasLinkedRelationship = hasTodaysCopy || isTodaysCopy || hasTomorrowCopy || isTomorrowsCopy
-
-  const style = {
-    transform: (nestZoneActive && !isDragging) ? undefined : CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : vis.dimmed ? 0.45 : 1,
-  }
-
   const CARD_SEL = '[data-testid^="card-"]:not([data-testid^="card-h"]):not([data-testid="card-list"])'
 
   const handleWrapperKeyDown = useCallback((e) => {
@@ -247,6 +223,31 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
     if ((e.ctrlKey || e.metaKey) && e.key === 'd') { e.preventDefault(); openDetailsModal(nodeId) }
     if ((e.ctrlKey || e.metaKey) && e.key === 'l') { e.preventDefault(); setShowLabelAssigner(true) }
   }, [node, nodeId, parentId, focusThis, toggleComplete, openDetailsModal, toggleExpand])
+
+  // All hooks have been called — safe to return early now
+  if (!node || !vis.visible) return null
+
+  const isCompleted = node.status === 'COMPLETED'
+  const hasChildren = node.childrenIds.length > 0
+  const nodeLabels = node.labelIds.map(id => labels[id]).filter(Boolean)
+
+  // Today's Tasks linking
+  const hasTodaysCopy = node.linkedNodeIds.some(lid => nodes[lid]?.isTodaysTask)
+  const isTodaysCopy = node.isTodaysTask && node.linkedNodeIds.length > 0 && node.id !== todaysTasksRootId
+  const canAddToToday = todaysTasksRootId && !node.isTodaysTask && !node.isTomorrowsTask && !hasTodaysCopy
+
+  // Tomorrow's Tasks linking
+  const hasTomorrowCopy = node.linkedNodeIds.some(lid => nodes[lid]?.isTomorrowsTask)
+  const isTomorrowsCopy = node.isTomorrowsTask && node.linkedNodeIds.length > 0 && node.id !== tomorrowsTasksRootId
+  const canAddToTomorrow = tomorrowsTasksRootId && !node.isTodaysTask && !node.isTomorrowsTask && !hasTomorrowCopy && !hasTodaysCopy
+
+  const hasLinkedRelationship = hasTodaysCopy || isTodaysCopy || hasTomorrowCopy || isTomorrowsCopy
+
+  const style = {
+    transform: (nestZoneActive && !isDragging) ? undefined : CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : vis.dimmed ? 0.45 : 1,
+  }
 
   return (
     <div

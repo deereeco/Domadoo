@@ -21,7 +21,7 @@ export default function FilterBar() {
   const tomorrowsTasksVisible = tomorrowsTasksRootId && rootOrder.includes(tomorrowsTasksRootId)
 
   return (
-    <div className="sticky top-14 z-30 bg-zinc-50/90 dark:bg-zinc-900/90 backdrop-blur border-b border-zinc-200 dark:border-zinc-800">
+    <div data-testid="filter-bar" className="sticky top-14 z-30 bg-zinc-50/90 dark:bg-zinc-900/90 backdrop-blur border-b border-zinc-200 dark:border-zinc-800">
       <div className="max-w-screen-xl mx-auto px-4 py-2 flex items-center gap-2 flex-wrap">
 
         {/* Labels button */}
@@ -71,11 +71,13 @@ export default function FilterBar() {
                   label={label}
                   mode={mode}
                   onToggle={(nextMode) => setFilter(label.id, nextMode)}
+                  data-testid={`filter-chip-${label.name.toLowerCase()}`}
                 />
               )
             })}
             {hasActiveFilters && (
               <button
+                data-testid="filter-clear"
                 onClick={clearFilters}
                 className="text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 px-2 py-0.5"
               >
@@ -119,7 +121,7 @@ export default function FilterBar() {
   )
 }
 
-function FilterChip({ label, mode, onToggle }) {
+function FilterChip({ label, mode, onToggle, 'data-testid': testId }) {
   const cycleMode = () => {
     if (mode === null) onToggle('show')
     else if (mode === 'show') onToggle('hide')
@@ -131,6 +133,7 @@ function FilterChip({ label, mode, onToggle }) {
   if (mode === 'show') {
     return (
       <span
+        data-testid={testId}
         className={`${baseStyle} ring-2`}
         style={{ backgroundColor: label.color + '22', color: label.color, ringColor: label.color }}
         onClick={cycleMode}
@@ -138,7 +141,7 @@ function FilterChip({ label, mode, onToggle }) {
       >
         <span className="w-2 h-2 rounded-full" style={{ backgroundColor: label.color }} />
         {label.name}
-        <span className="text-[10px] opacity-70">show</span>
+        <span data-testid={testId && `${testId}-badge`} className="text-[10px] opacity-70">show</span>
       </span>
     )
   }
@@ -146,18 +149,20 @@ function FilterChip({ label, mode, onToggle }) {
   if (mode === 'hide') {
     return (
       <span
+        data-testid={testId}
         className={`${baseStyle} line-through opacity-60 bg-zinc-100 dark:bg-zinc-800 text-zinc-400`}
         onClick={cycleMode}
         title="Hidden — click to clear"
       >
         {label.name}
-        <span className="text-[10px]">hide</span>
+        <span data-testid={testId && `${testId}-badge`} className="text-[10px]">hide</span>
       </span>
     )
   }
 
   return (
     <span
+      data-testid={testId}
       className={`${baseStyle} bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700`}
       onClick={cycleMode}
       title="Click to show only this label"

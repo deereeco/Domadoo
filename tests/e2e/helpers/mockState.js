@@ -27,6 +27,15 @@ export const IDS = {
   TOMORROW_CARD:  'test-tmrw-card--0000-000000000019',
   ORIG_TOMORROW:  'test-orig-tmrw--0000-000000000020',
   TOMORROW_COPY:  'test-orig-tmrw--0000-000000000020_tomorrow',
+  // Filter test IDs
+  LABEL_WORK:           'test-label-work-0000-000000000021',
+  LABEL_PERSONAL:       'test-label-pers-0000-000000000022',
+  FILTER_CARD_A:        'test-filter-ca-0000-0000-000000000023',
+  FILTER_CARD_B:        'test-filter-cb-0000-0000-000000000024',
+  FILTER_TASK_WORK_1:   'test-filter-w1-0000-0000-000000000025',
+  FILTER_TASK_WORK_2:   'test-filter-w2-0000-0000-000000000026',
+  FILTER_TASK_PERSONAL: 'test-filter-p1-0000-0000-000000000027',
+  FILTER_TASK_UNLABELED:'test-filter-nl-0000-0000-000000000028',
   // Breadcrumb test IDs
   CARD_LAB:       'test-card-lab0-0000-0000-000000000010',
   TASK_CLEANING:  'test-node-cln0-0000-0000-000000000011',
@@ -436,4 +445,55 @@ export async function setupTomorrowState(page, opts = {}) {
   await page.route('https://apis.google.com/**', route => route.abort())
   await page.route('https://accounts.google.com/**', route => route.abort())
   await injectState(page, buildTomorrowState(opts))
+}
+
+/**
+ * State for filter tests:
+ *   Card A: Work Task 1 (Work), Work Task 2 (Work), Unlabeled Task (no label)
+ *   Card B: Personal Task (Personal)
+ *
+ * Custom labels: Work (#EF4444), Personal (#3B82F6)
+ * This makes filter chips appear in the FilterBar.
+ */
+export function buildFilterState() {
+  return {
+    nodes: {
+      [IDS.FILTER_CARD_A]: node(IDS.FILTER_CARD_A, null, [IDS.FILTER_TASK_WORK_1, IDS.FILTER_TASK_WORK_2, IDS.FILTER_TASK_UNLABELED], 'Card A'),
+      [IDS.FILTER_CARD_B]: node(IDS.FILTER_CARD_B, null, [IDS.FILTER_TASK_PERSONAL], 'Card B'),
+      [IDS.FILTER_TASK_WORK_1]: {
+        ...node(IDS.FILTER_TASK_WORK_1, IDS.FILTER_CARD_A, [], 'Work Task 1'),
+        labelIds: [IDS.LABEL_WORK],
+      },
+      [IDS.FILTER_TASK_WORK_2]: {
+        ...node(IDS.FILTER_TASK_WORK_2, IDS.FILTER_CARD_A, [], 'Work Task 2'),
+        labelIds: [IDS.LABEL_WORK],
+      },
+      [IDS.FILTER_TASK_UNLABELED]: node(IDS.FILTER_TASK_UNLABELED, IDS.FILTER_CARD_A, [], 'Unlabeled Task'),
+      [IDS.FILTER_TASK_PERSONAL]: {
+        ...node(IDS.FILTER_TASK_PERSONAL, IDS.FILTER_CARD_B, [], 'Personal Task'),
+        labelIds: [IDS.LABEL_PERSONAL],
+      },
+    },
+    labels: {
+      [IDS.TODAY_LABEL]:    { id: IDS.TODAY_LABEL, name: 'Today', color: '#FCD34D', isSystem: true },
+      [IDS.LABEL_WORK]:     { id: IDS.LABEL_WORK, name: 'Work', color: '#EF4444', isSystem: false },
+      [IDS.LABEL_PERSONAL]: { id: IDS.LABEL_PERSONAL, name: 'Personal', color: '#3B82F6', isSystem: false },
+    },
+    rootOrder: [IDS.FILTER_CARD_A, IDS.FILTER_CARD_B],
+    activeFilters: {},
+    todaysTasksRootId: null,
+    todaysTasksLabelId: IDS.TODAY_LABEL,
+    theme: 'light',
+    dragMode: false,
+    nestTargetId: null,
+    nestZoneActive: false,
+    history: [],
+    lastCleanupDate: null,
+  }
+}
+
+export async function setupFilterState(page) {
+  await page.route('https://apis.google.com/**', route => route.abort())
+  await page.route('https://accounts.google.com/**', route => route.abort())
+  await injectState(page, buildFilterState())
 }
