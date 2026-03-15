@@ -508,6 +508,8 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
         </div>
         </div>{/* end interactive content wrapper */}
 
+      </div>
+
       {/* Delete confirmation for linked nodes */}
       {showDeleteConfirm && (
         <div className="mt-1 ml-6 p-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-xs">
@@ -578,7 +580,6 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
           )}
         </div>
       )}
-      </div>
 
       {/* Children */}
       {node.uiState.isExpanded && hasChildren && (
