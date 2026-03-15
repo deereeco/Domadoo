@@ -5,6 +5,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { useStore } from '../../store/useStore.js'
 import NodeItem from '../Node/NodeItem.jsx'
 import NodeContent from '../Node/NodeContent.jsx'
+import LabelAssigner from '../Labels/LabelAssigner.jsx'
 
 export default function RootCard({ nodeId }) {
   const node = useStore(s => s.nodes[nodeId])
@@ -26,13 +27,25 @@ export default function RootCard({ nodeId }) {
 
   const headerRef = useRef(null)
   const confirmRef = useRef(null)
+  const cardMenuRef = useRef(null)
   const [pendingDelete, setPendingDelete] = useState(false)
+  const [showCardMenu, setShowCardMenu] = useState(false)
+  const [showLabelAssigner, setShowLabelAssigner] = useState(false)
   const isCollapsed = !!collapsedCards[nodeId]
   const isPinned = !!pinnedCards[nodeId]
 
   useEffect(() => {
     if (pendingDelete) confirmRef.current?.focus()
   }, [pendingDelete])
+
+  useEffect(() => {
+    if (!showCardMenu) return
+    const handler = (e) => {
+      if (!cardMenuRef.current?.contains(e.target)) setShowCardMenu(false)
+    }
+    document.addEventListener('pointerdown', handler)
+    return () => document.removeEventListener('pointerdown', handler)
+  }, [showCardMenu])
 
   const focusNode = useCallback((targetId) => {
     // Find the contenteditable in a node and focus it
@@ -196,18 +209,6 @@ export default function RootCard({ nodeId }) {
             </svg>
           </button>
 
-          {/* Open details button */}
-          <button
-            onClick={() => openDetailsModal(nodeId)}
-            className="flex-shrink-0 text-zinc-300 dark:text-zinc-600 hover:text-zinc-500 dark:hover:text-zinc-400 transition-colors"
-            title="Open details"
-            tabIndex={-1}
-          >
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
-            </svg>
-          </button>
-
           {/* Collapse toggle */}
           <button
             onClick={() => toggleCardCollapse(nodeId)}
@@ -220,42 +221,102 @@ export default function RootCard({ nodeId }) {
             </svg>
           </button>
 
-          {!isToday && !isTomorrow && todaysTasksLabelId && (
+          {/* Overflow menu */}
+          <div ref={cardMenuRef} className={`relative flex-shrink-0 ${showLabelAssigner ? 'z-50' : ''}`}>
             <button
-              data-testid={`today-toggle-card-${nodeId}`}
-              onClick={() => toggleLabelOnNode(nodeId, todaysTasksLabelId)}
-              className={`flex-shrink-0 transition-colors ${hasTodayLabel ? 'text-amber-400' : 'text-zinc-300 dark:text-zinc-600 hover:text-amber-400'}`}
-              title={hasTodayLabel ? 'Remove from Today\'s Tasks' : 'Add to Today\'s Tasks'}
               tabIndex={-1}
+              onClick={() => setShowCardMenu(v => !v)}
+              className="text-zinc-300 dark:text-zinc-600 hover:text-zinc-500 dark:hover:text-zinc-400 transition-colors p-0.5 rounded"
+              title="Actions"
             >
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <circle cx="12" cy="12" r="4" strokeWidth={2} />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
               </svg>
             </button>
-          )}
-          {!isToday && !isTomorrow && tomorrowsTasksLabelId && (
-            <button
-              data-testid={`tomorrow-toggle-card-${nodeId}`}
-              onClick={() => toggleLabelOnNode(nodeId, tomorrowsTasksLabelId)}
-              className={`flex-shrink-0 transition-colors ${hasTomorrowLabel ? 'text-blue-400' : 'text-zinc-300 dark:text-zinc-600 hover:text-blue-400'}`}
-              title={hasTomorrowLabel ? "Remove from Tomorrow's Tasks" : "Add to Tomorrow's Tasks"}
-              tabIndex={-1}
-            >
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
-              </svg>
-            </button>
-          )}
-          <button
-            onClick={() => deleteNode(nodeId)}
-            className="flex-shrink-0 text-zinc-300 dark:text-zinc-600 hover:text-red-400 transition-colors"
-            tabIndex={-1}
-          >
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+
+            {showCardMenu && (
+              <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg shadow-lg bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 py-1">
+                <button
+                  tabIndex={-1}
+                  onClick={() => { addChildNode(nodeId); setShowCardMenu(false) }}
+                  className="flex items-center gap-2 px-3 py-1.5 text-xs text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 w-full text-left"
+                >
+                  <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v14M5 12h14" />
+                  </svg>
+                  Add item
+                </button>
+
+                <button
+                  tabIndex={-1}
+                  onClick={() => { setShowCardMenu(false); setShowLabelAssigner(true) }}
+                  className="flex items-center gap-2 px-3 py-1.5 text-xs text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 w-full text-left"
+                >
+                  <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                  </svg>
+                  Label
+                </button>
+
+                <button
+                  tabIndex={-1}
+                  onClick={() => { openDetailsModal(nodeId); setShowCardMenu(false) }}
+                  className="flex items-center gap-2 px-3 py-1.5 text-xs text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 w-full text-left"
+                >
+                  <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
+                  </svg>
+                  Details
+                </button>
+
+                {!isToday && !isTomorrow && todaysTasksLabelId && (
+                  <button
+                    tabIndex={-1}
+                    data-testid={`today-toggle-card-${nodeId}`}
+                    onClick={() => { toggleLabelOnNode(nodeId, todaysTasksLabelId); setShowCardMenu(false) }}
+                    className="flex items-center gap-2 px-3 py-1.5 text-xs text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 w-full text-left"
+                  >
+                    <svg className={`w-3.5 h-3.5 flex-shrink-0 ${hasTodayLabel ? 'text-amber-400' : 'text-amber-500'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <circle cx="12" cy="12" r="4" strokeWidth={2} />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+                    </svg>
+                    {hasTodayLabel ? "Remove from Today's" : "Add to Today's"}
+                  </button>
+                )}
+
+                {!isToday && !isTomorrow && tomorrowsTasksLabelId && (
+                  <button
+                    tabIndex={-1}
+                    data-testid={`tomorrow-toggle-card-${nodeId}`}
+                    onClick={() => { toggleLabelOnNode(nodeId, tomorrowsTasksLabelId); setShowCardMenu(false) }}
+                    className="flex items-center gap-2 px-3 py-1.5 text-xs text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 w-full text-left"
+                  >
+                    <svg className={`w-3.5 h-3.5 flex-shrink-0 ${hasTomorrowLabel ? 'text-blue-400' : 'text-blue-500'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
+                    </svg>
+                    {hasTomorrowLabel ? "Remove from Tomorrow's" : "Add to Tomorrow's"}
+                  </button>
+                )}
+
+                <div className="my-1 border-t border-zinc-100 dark:border-zinc-700" />
+
+                <button
+                  tabIndex={-1}
+                  onClick={() => { setShowCardMenu(false); setPendingDelete(true) }}
+                  className="flex items-center gap-2 px-3 py-1.5 text-xs text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 w-full text-left"
+                >
+                  <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  Delete card
+                </button>
+              </div>
+            )}
+
+            {showLabelAssigner && (
+              <LabelAssigner nodeId={nodeId} onClose={() => setShowLabelAssigner(false)} />
+            )}
+          </div>
         </div>
       </div>
 
