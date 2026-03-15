@@ -410,66 +410,268 @@ export const useStore = create((set, get) => ({
     set(state => {
       const todaysId = state.todaysTasksRootId
       if (!todaysId) return {}
-      const todaysCard = state.nodes[todaysId]
       const node = state.nodes[nodeId]
-      if (!todaysCard || !node) return {}
+      if (!node) return {}
 
       // Guard: already linked to today's tasks
-      if (node.linkedNodeIds.some(lid => state.nodes[lid]?.isTodaysTask)) return {}
+      const existingTodayLinkId = node.linkedNodeIds.find(lid => state.nodes[lid]?.isTodaysTask)
+      if (existingTodayLinkId) {
+        // Upgrade auto-group node to explicit if the user explicitly adds it
+        if (state.nodes[existingTodayLinkId]?.isAutoGroupNode) {
+          const todayLabelId = state.todaysTasksLabelId
+          return {
+            nodes: {
+              ...state.nodes,
+              [existingTodayLinkId]: { ...state.nodes[existingTodayLinkId], isAutoGroupNode: false },
+              [nodeId]: todayLabelId
+                ? { ...node, labelIds: [...new Set([...node.labelIds, todayLabelId])] }
+                : node,
+            },
+          }
+        }
+        return {}
+      }
 
-      const nodeUpdates = {}
-      const newNodes = {}
+      if (!state.nodes[todaysId]) return {}
+
+      // Work in newNodes (shallow copy; individual nodes replaced via spread when modified)
+      const newNodes = { ...state.nodes }
+
+      // Get ancestor chain [parent, grandparent, ..., rootCard] closest-first, includes root card
+      function getAncestors(id) {
+        const chain = []
+        let cur = newNodes[id]
+        while (cur?.parentId) {
+          chain.push(cur.parentId)
+          cur = newNodes[cur.parentId]
+        }
+        return chain
+      }
+
+      // Create an auto-group _today copy of ancestorId under groupParentId
+      function createGroupNode(ancestorId, groupParentId) {
+        const ancestor = newNodes[ancestorId]
+        if (!ancestor) return
+        const groupId = ancestorId + '_today'
+        newNodes[groupId] = {
+          ...ancestor,
+          id: groupId,
+          parentId: groupParentId,
+          childrenIds: [],
+          isTodaysTask: true,
+          isTomorrowsTask: false,
+          linkedNodeIds: [ancestorId],
+          isAutoGroupNode: true,
+        }
+        newNodes[ancestorId] = {
+          ...newNodes[ancestorId],
+          linkedNodeIds: [...new Set([...newNodes[ancestorId].linkedNodeIds, groupId])],
+        }
+      }
+
+      // Get path from ancestor to targetId: [child1, ..., targetId] (excludes ancestor itself)
+      function getPathToNode(ancestorId, targetId) {
+        const path = []
+        let cur = newNodes[targetId]
+        while (cur && cur.id !== ancestorId) {
+          path.unshift(cur.id)
+          if (!cur.parentId) break
+          cur = newNodes[cur.parentId]
+        }
+        return path
+      }
+
+      // Check if origId is a strict descendant of ancestorId
+      function isDescendantOf(origId, ancestorId) {
+        let cur = newNodes[origId]
+        while (cur?.parentId) {
+          if (cur.parentId === ancestorId) return true
+          cur = newNodes[cur.parentId]
+        }
+        return false
+      }
 
       // Recursively create _today linked copies for originalId and all descendants
       function createLinkedTree(originalId, todayParentId) {
-        const original = nodeUpdates[originalId] || state.nodes[originalId]
+        const original = newNodes[originalId]
         if (!original) return
         const linkedId = originalId + '_today'
-
-        nodeUpdates[originalId] = {
-          ...original,
-          linkedNodeIds: [...new Set([...original.linkedNodeIds, linkedId])],
+        newNodes[originalId] = {
+          ...newNodes[originalId],
+          linkedNodeIds: [...new Set([...newNodes[originalId].linkedNodeIds, linkedId])],
         }
-
         const linkedChildIds = original.childrenIds.map(childId => {
           createLinkedTree(childId, linkedId)
           return childId + '_today'
         })
-
         newNodes[linkedId] = {
-          ...state.nodes[originalId],
+          ...original,
           id: linkedId,
           parentId: todayParentId,
           childrenIds: linkedChildIds,
           isTodaysTask: true,
+          isTomorrowsTask: false,
           linkedNodeIds: [originalId],
+          isAutoGroupNode: false,
         }
       }
 
-      createLinkedTree(nodeId, todaysId)
+      // Ensure group nodes exist from commonAncestorId down to targetNodeId's parent.
+      // Returns the _today id that should be targetNodeId's direct parent.
+      function ensureGroupHierarchy(commonAncestorId, commonAncestorTodayId, targetNodeId) {
+        const pathToNode = getPathToNode(commonAncestorId, targetNodeId)
+        let parentTodayId = commonAncestorTodayId
+        for (let i = 0; i < pathToNode.length - 1; i++) {
+          const stepId = pathToNode[i]
+          const stepTodayId = stepId + '_today'
+          if (!newNodes[stepTodayId]) {
+            createGroupNode(stepId, parentTodayId)
+            newNodes[parentTodayId] = {
+              ...newNodes[parentTodayId],
+              childrenIds: [...newNodes[parentTodayId].childrenIds, stepTodayId],
+            }
+          }
+          parentTodayId = stepTodayId
+        }
+        return parentTodayId
+      }
+
+      const nodeAncestors = getAncestors(nodeId)
+
+      // Branch 1: an ancestor of nodeId already has a _today copy — nest under it
+      let placed = false
+      for (const ancestorId of nodeAncestors) {
+        const ancestorTodayId = ancestorId + '_today'
+        if (newNodes[ancestorTodayId]?.isTodaysTask) {
+          const parentTodayId = ensureGroupHierarchy(ancestorId, ancestorTodayId, nodeId)
+          createLinkedTree(nodeId, parentTodayId)
+          newNodes[parentTodayId] = {
+            ...newNodes[parentTodayId],
+            childrenIds: [...newNodes[parentTodayId].childrenIds, nodeId + '_today'],
+          }
+          placed = true
+          break
+        }
+      }
+
+      if (!placed) {
+        // Branch 2: find deepest common ancestor with any existing Today root child
+        let commonAncestorId = null
+        for (const childId of newNodes[todaysId].childrenIds) {
+          const child = newNodes[childId]
+          if (!child?.linkedNodeIds?.length) continue
+          const origId = child.linkedNodeIds[0]
+          const origWithAncestors = [origId, ...getAncestors(origId)]
+          const found = nodeAncestors.find(a => origWithAncestors.includes(a))
+          if (found) {
+            if (!commonAncestorId || nodeAncestors.indexOf(found) < nodeAncestors.indexOf(commonAncestorId)) {
+              commonAncestorId = found
+            }
+          }
+        }
+
+        if (commonAncestorId) {
+          // Determine the outermost group node (direct child of Today root = root card ancestor)
+          const commonAncestorAncestors = getAncestors(commonAncestorId)
+          const outermostGroupId = newNodes[commonAncestorId]?.parentId
+            ? commonAncestorAncestors[commonAncestorAncestors.length - 1]
+            : commonAncestorId
+          const outermostTodayId = outermostGroupId + '_today'
+
+          // Create outermost group at Today root if needed
+          if (!newNodes[outermostTodayId]) {
+            createGroupNode(outermostGroupId, todaysId)
+            newNodes[todaysId] = {
+              ...newNodes[todaysId],
+              childrenIds: [...newNodes[todaysId].childrenIds, outermostTodayId],
+            }
+          }
+
+          // Create group nodes from outermost down to commonAncestor
+          let caParentTodayId = outermostTodayId
+          if (outermostGroupId !== commonAncestorId) {
+            const pathToCA = getPathToNode(outermostGroupId, commonAncestorId)
+            for (const stepId of pathToCA) {
+              const stepTodayId = stepId + '_today'
+              if (!newNodes[stepTodayId]) {
+                createGroupNode(stepId, caParentTodayId)
+                newNodes[caParentTodayId] = {
+                  ...newNodes[caParentTodayId],
+                  childrenIds: [...newNodes[caParentTodayId].childrenIds, stepTodayId],
+                }
+              }
+              caParentTodayId = stepTodayId
+            }
+          }
+
+          // Place nodeId_today in the hierarchy
+          const parentTodayId = ensureGroupHierarchy(commonAncestorId, caParentTodayId, nodeId)
+          createLinkedTree(nodeId, parentTodayId)
+          newNodes[parentTodayId] = {
+            ...newNodes[parentTodayId],
+            childrenIds: [...newNodes[parentTodayId].childrenIds, nodeId + '_today'],
+          }
+
+          // Retroactive merge: move existing Today root children that belong under outermostGroup
+          const toMoveIds = newNodes[todaysId].childrenIds.filter(childId => {
+            if (childId === outermostTodayId) return false
+            const child = newNodes[childId]
+            if (!child?.linkedNodeIds?.length) return false
+            const origId = child.linkedNodeIds[0]
+            return origId === outermostGroupId || isDescendantOf(origId, outermostGroupId)
+          })
+
+          for (const childId of toMoveIds) {
+            const child = newNodes[childId]
+            const origId = child.linkedNodeIds[0]
+            const pathToOrig = getPathToNode(outermostGroupId, origId)
+            let siblingParentTodayId = outermostTodayId
+            for (let i = 0; i < pathToOrig.length - 1; i++) {
+              const stepId = pathToOrig[i]
+              const stepTodayId = stepId + '_today'
+              if (!newNodes[stepTodayId]) {
+                createGroupNode(stepId, siblingParentTodayId)
+                newNodes[siblingParentTodayId] = {
+                  ...newNodes[siblingParentTodayId],
+                  childrenIds: [...newNodes[siblingParentTodayId].childrenIds, stepTodayId],
+                }
+              }
+              siblingParentTodayId = stepTodayId
+            }
+            newNodes[childId] = { ...newNodes[childId], parentId: siblingParentTodayId }
+            newNodes[siblingParentTodayId] = {
+              ...newNodes[siblingParentTodayId],
+              childrenIds: [...newNodes[siblingParentTodayId].childrenIds, childId],
+            }
+          }
+
+          if (toMoveIds.length > 0) {
+            const toMoveSet = new Set(toMoveIds)
+            newNodes[todaysId] = {
+              ...newNodes[todaysId],
+              childrenIds: newNodes[todaysId].childrenIds.filter(id => !toMoveSet.has(id)),
+            }
+          }
+        } else {
+          // Branch 3: no common ancestor — standard placement at Today root
+          createLinkedTree(nodeId, todaysId)
+          newNodes[todaysId] = {
+            ...newNodes[todaysId],
+            childrenIds: [...newNodes[todaysId].childrenIds, nodeId + '_today'],
+          }
+        }
+      }
 
       // Apply today label to root original only
       const todayLabelId = state.todaysTasksLabelId
       if (todayLabelId) {
-        nodeUpdates[nodeId] = {
-          ...nodeUpdates[nodeId],
-          labelIds: [...new Set([...nodeUpdates[nodeId].labelIds, todayLabelId])],
+        newNodes[nodeId] = {
+          ...newNodes[nodeId],
+          labelIds: [...new Set([...newNodes[nodeId].labelIds, todayLabelId])],
         }
       }
 
-      const updatedTodaysCard = {
-        ...todaysCard,
-        childrenIds: [...todaysCard.childrenIds, nodeId + '_today'],
-      }
-
-      return {
-        nodes: {
-          ...state.nodes,
-          ...nodeUpdates,
-          ...newNodes,
-          [todaysId]: updatedTodaysCard,
-        },
-      }
+      return { nodes: newNodes }
     })
   },
 
@@ -481,12 +683,12 @@ export const useStore = create((set, get) => ({
 
       const newNodes = { ...state.nodes }
 
-      // Remove root linked copy from Today's Tasks card's childrenIds
-      const todaysId = linkedNode.parentId
-      if (todaysId && newNodes[todaysId]) {
-        newNodes[todaysId] = {
-          ...newNodes[todaysId],
-          childrenIds: newNodes[todaysId].childrenIds.filter(c => c !== linkedNodeId),
+      // Remove this copy from its parent's childrenIds
+      const parentId = linkedNode.parentId
+      if (parentId && newNodes[parentId]) {
+        newNodes[parentId] = {
+          ...newNodes[parentId],
+          childrenIds: newNodes[parentId].childrenIds.filter(c => c !== linkedNodeId),
         }
       }
 
@@ -500,7 +702,7 @@ export const useStore = create((set, get) => ({
       }
       collect(linkedNodeId)
 
-      // Clean up linkedNodeIds on all originals; remove today label from root original only
+      // Clean up linkedNodeIds on all originals; remove today label from any original that has it
       toDelete.forEach(tid => {
         const todayCopy = newNodes[tid]
         if (!todayCopy) return
@@ -509,7 +711,7 @@ export const useStore = create((set, get) => ({
           if (!original) return
           const filteredLinks = original.linkedNodeIds.filter(lid => lid !== tid)
           let { labelIds } = original
-          if (tid === linkedNodeId && state.todaysTasksLabelId) {
+          if (state.todaysTasksLabelId && labelIds.includes(state.todaysTasksLabelId)) {
             labelIds = labelIds.filter(lid => lid !== state.todaysTasksLabelId)
           }
           newNodes[originalId] = { ...original, linkedNodeIds: filteredLinks, labelIds }
@@ -518,6 +720,30 @@ export const useStore = create((set, get) => ({
 
       // Delete all collected _today nodes
       toDelete.forEach(tid => delete newNodes[tid])
+
+      // Auto-cleanup: cascade-remove empty auto-group ancestors
+      let checkParentId = parentId
+      while (checkParentId && checkParentId !== state.todaysTasksRootId) {
+        const checkParent = newNodes[checkParentId]
+        if (!checkParent || !checkParent.isAutoGroupNode || checkParent.childrenIds.length > 0) break
+        const grandParentId = checkParent.parentId
+        if (grandParentId && newNodes[grandParentId]) {
+          newNodes[grandParentId] = {
+            ...newNodes[grandParentId],
+            childrenIds: newNodes[grandParentId].childrenIds.filter(c => c !== checkParentId),
+          }
+        }
+        checkParent.linkedNodeIds.forEach(origId => {
+          if (newNodes[origId]) {
+            newNodes[origId] = {
+              ...newNodes[origId],
+              linkedNodeIds: newNodes[origId].linkedNodeIds.filter(lid => lid !== checkParentId),
+            }
+          }
+        })
+        delete newNodes[checkParentId]
+        checkParentId = grandParentId
+      }
 
       return { nodes: newNodes }
     })
@@ -528,66 +754,255 @@ export const useStore = create((set, get) => ({
     set(state => {
       const tomorrowsId = state.tomorrowsTasksRootId
       if (!tomorrowsId) return {}
-      const tomorrowsCard = state.nodes[tomorrowsId]
       const node = state.nodes[nodeId]
-      if (!tomorrowsCard || !node) return {}
+      if (!node) return {}
 
       // Guard: already linked to tomorrow's tasks
-      if (node.linkedNodeIds.some(lid => state.nodes[lid]?.isTomorrowsTask)) return {}
+      const existingTomorrowLinkId = node.linkedNodeIds.find(lid => state.nodes[lid]?.isTomorrowsTask)
+      if (existingTomorrowLinkId) {
+        // Upgrade auto-group node to explicit if the user explicitly adds it
+        if (state.nodes[existingTomorrowLinkId]?.isAutoGroupNode) {
+          const tomorrowLabelId = state.tomorrowsTasksLabelId
+          return {
+            nodes: {
+              ...state.nodes,
+              [existingTomorrowLinkId]: { ...state.nodes[existingTomorrowLinkId], isAutoGroupNode: false },
+              [nodeId]: tomorrowLabelId
+                ? { ...node, labelIds: [...new Set([...node.labelIds, tomorrowLabelId])] }
+                : node,
+            },
+          }
+        }
+        return {}
+      }
 
-      const nodeUpdates = {}
-      const newNodes = {}
+      if (!state.nodes[tomorrowsId]) return {}
+
+      const newNodes = { ...state.nodes }
+
+      function getAncestors(id) {
+        const chain = []
+        let cur = newNodes[id]
+        while (cur?.parentId) {
+          chain.push(cur.parentId)
+          cur = newNodes[cur.parentId]
+        }
+        return chain
+      }
+
+      function createGroupNode(ancestorId, groupParentId) {
+        const ancestor = newNodes[ancestorId]
+        if (!ancestor) return
+        const groupId = ancestorId + '_tomorrow'
+        newNodes[groupId] = {
+          ...ancestor,
+          id: groupId,
+          parentId: groupParentId,
+          childrenIds: [],
+          isTomorrowsTask: true,
+          isTodaysTask: false,
+          linkedNodeIds: [ancestorId],
+          isAutoGroupNode: true,
+        }
+        newNodes[ancestorId] = {
+          ...newNodes[ancestorId],
+          linkedNodeIds: [...new Set([...newNodes[ancestorId].linkedNodeIds, groupId])],
+        }
+      }
+
+      function getPathToNode(ancestorId, targetId) {
+        const path = []
+        let cur = newNodes[targetId]
+        while (cur && cur.id !== ancestorId) {
+          path.unshift(cur.id)
+          if (!cur.parentId) break
+          cur = newNodes[cur.parentId]
+        }
+        return path
+      }
+
+      function isDescendantOf(origId, ancestorId) {
+        let cur = newNodes[origId]
+        while (cur?.parentId) {
+          if (cur.parentId === ancestorId) return true
+          cur = newNodes[cur.parentId]
+        }
+        return false
+      }
 
       function createLinkedTree(originalId, tomorrowParentId) {
-        const original = nodeUpdates[originalId] || state.nodes[originalId]
+        const original = newNodes[originalId]
         if (!original) return
         const linkedId = originalId + '_tomorrow'
-
-        nodeUpdates[originalId] = {
-          ...original,
-          linkedNodeIds: [...new Set([...original.linkedNodeIds, linkedId])],
+        newNodes[originalId] = {
+          ...newNodes[originalId],
+          linkedNodeIds: [...new Set([...newNodes[originalId].linkedNodeIds, linkedId])],
         }
-
         const linkedChildIds = original.childrenIds.map(childId => {
           createLinkedTree(childId, linkedId)
           return childId + '_tomorrow'
         })
-
         newNodes[linkedId] = {
-          ...state.nodes[originalId],
+          ...original,
           id: linkedId,
           parentId: tomorrowParentId,
           childrenIds: linkedChildIds,
           isTomorrowsTask: true,
           isTodaysTask: false,
           linkedNodeIds: [originalId],
+          isAutoGroupNode: false,
         }
       }
 
-      createLinkedTree(nodeId, tomorrowsId)
+      function ensureGroupHierarchy(commonAncestorId, commonAncestorTomorrowId, targetNodeId) {
+        const pathToNode = getPathToNode(commonAncestorId, targetNodeId)
+        let parentTomorrowId = commonAncestorTomorrowId
+        for (let i = 0; i < pathToNode.length - 1; i++) {
+          const stepId = pathToNode[i]
+          const stepTomorrowId = stepId + '_tomorrow'
+          if (!newNodes[stepTomorrowId]) {
+            createGroupNode(stepId, parentTomorrowId)
+            newNodes[parentTomorrowId] = {
+              ...newNodes[parentTomorrowId],
+              childrenIds: [...newNodes[parentTomorrowId].childrenIds, stepTomorrowId],
+            }
+          }
+          parentTomorrowId = stepTomorrowId
+        }
+        return parentTomorrowId
+      }
+
+      const nodeAncestors = getAncestors(nodeId)
+
+      // Branch 1: an ancestor already has a _tomorrow copy — nest under it
+      let placed = false
+      for (const ancestorId of nodeAncestors) {
+        const ancestorTomorrowId = ancestorId + '_tomorrow'
+        if (newNodes[ancestorTomorrowId]?.isTomorrowsTask) {
+          const parentTomorrowId = ensureGroupHierarchy(ancestorId, ancestorTomorrowId, nodeId)
+          createLinkedTree(nodeId, parentTomorrowId)
+          newNodes[parentTomorrowId] = {
+            ...newNodes[parentTomorrowId],
+            childrenIds: [...newNodes[parentTomorrowId].childrenIds, nodeId + '_tomorrow'],
+          }
+          placed = true
+          break
+        }
+      }
+
+      if (!placed) {
+        // Branch 2: find deepest common ancestor with any existing Tomorrow root child
+        let commonAncestorId = null
+        for (const childId of newNodes[tomorrowsId].childrenIds) {
+          const child = newNodes[childId]
+          if (!child?.linkedNodeIds?.length) continue
+          const origId = child.linkedNodeIds[0]
+          const origWithAncestors = [origId, ...getAncestors(origId)]
+          const found = nodeAncestors.find(a => origWithAncestors.includes(a))
+          if (found) {
+            if (!commonAncestorId || nodeAncestors.indexOf(found) < nodeAncestors.indexOf(commonAncestorId)) {
+              commonAncestorId = found
+            }
+          }
+        }
+
+        if (commonAncestorId) {
+          const commonAncestorAncestors = getAncestors(commonAncestorId)
+          const outermostGroupId = newNodes[commonAncestorId]?.parentId
+            ? commonAncestorAncestors[commonAncestorAncestors.length - 1]
+            : commonAncestorId
+          const outermostTomorrowId = outermostGroupId + '_tomorrow'
+
+          if (!newNodes[outermostTomorrowId]) {
+            createGroupNode(outermostGroupId, tomorrowsId)
+            newNodes[tomorrowsId] = {
+              ...newNodes[tomorrowsId],
+              childrenIds: [...newNodes[tomorrowsId].childrenIds, outermostTomorrowId],
+            }
+          }
+
+          let caParentTomorrowId = outermostTomorrowId
+          if (outermostGroupId !== commonAncestorId) {
+            const pathToCA = getPathToNode(outermostGroupId, commonAncestorId)
+            for (const stepId of pathToCA) {
+              const stepTomorrowId = stepId + '_tomorrow'
+              if (!newNodes[stepTomorrowId]) {
+                createGroupNode(stepId, caParentTomorrowId)
+                newNodes[caParentTomorrowId] = {
+                  ...newNodes[caParentTomorrowId],
+                  childrenIds: [...newNodes[caParentTomorrowId].childrenIds, stepTomorrowId],
+                }
+              }
+              caParentTomorrowId = stepTomorrowId
+            }
+          }
+
+          const parentTomorrowId = ensureGroupHierarchy(commonAncestorId, caParentTomorrowId, nodeId)
+          createLinkedTree(nodeId, parentTomorrowId)
+          newNodes[parentTomorrowId] = {
+            ...newNodes[parentTomorrowId],
+            childrenIds: [...newNodes[parentTomorrowId].childrenIds, nodeId + '_tomorrow'],
+          }
+
+          const toMoveIds = newNodes[tomorrowsId].childrenIds.filter(childId => {
+            if (childId === outermostTomorrowId) return false
+            const child = newNodes[childId]
+            if (!child?.linkedNodeIds?.length) return false
+            const origId = child.linkedNodeIds[0]
+            return origId === outermostGroupId || isDescendantOf(origId, outermostGroupId)
+          })
+
+          for (const childId of toMoveIds) {
+            const child = newNodes[childId]
+            const origId = child.linkedNodeIds[0]
+            const pathToOrig = getPathToNode(outermostGroupId, origId)
+            let siblingParentTomorrowId = outermostTomorrowId
+            for (let i = 0; i < pathToOrig.length - 1; i++) {
+              const stepId = pathToOrig[i]
+              const stepTomorrowId = stepId + '_tomorrow'
+              if (!newNodes[stepTomorrowId]) {
+                createGroupNode(stepId, siblingParentTomorrowId)
+                newNodes[siblingParentTomorrowId] = {
+                  ...newNodes[siblingParentTomorrowId],
+                  childrenIds: [...newNodes[siblingParentTomorrowId].childrenIds, stepTomorrowId],
+                }
+              }
+              siblingParentTomorrowId = stepTomorrowId
+            }
+            newNodes[childId] = { ...newNodes[childId], parentId: siblingParentTomorrowId }
+            newNodes[siblingParentTomorrowId] = {
+              ...newNodes[siblingParentTomorrowId],
+              childrenIds: [...newNodes[siblingParentTomorrowId].childrenIds, childId],
+            }
+          }
+
+          if (toMoveIds.length > 0) {
+            const toMoveSet = new Set(toMoveIds)
+            newNodes[tomorrowsId] = {
+              ...newNodes[tomorrowsId],
+              childrenIds: newNodes[tomorrowsId].childrenIds.filter(id => !toMoveSet.has(id)),
+            }
+          }
+        } else {
+          // Branch 3: no common ancestor — standard placement at Tomorrow root
+          createLinkedTree(nodeId, tomorrowsId)
+          newNodes[tomorrowsId] = {
+            ...newNodes[tomorrowsId],
+            childrenIds: [...newNodes[tomorrowsId].childrenIds, nodeId + '_tomorrow'],
+          }
+        }
+      }
 
       // Apply tomorrow label to root original only
       const tomorrowLabelId = state.tomorrowsTasksLabelId
       if (tomorrowLabelId) {
-        nodeUpdates[nodeId] = {
-          ...nodeUpdates[nodeId],
-          labelIds: [...new Set([...nodeUpdates[nodeId].labelIds, tomorrowLabelId])],
+        newNodes[nodeId] = {
+          ...newNodes[nodeId],
+          labelIds: [...new Set([...newNodes[nodeId].labelIds, tomorrowLabelId])],
         }
       }
 
-      const updatedTomorrowsCard = {
-        ...tomorrowsCard,
-        childrenIds: [...tomorrowsCard.childrenIds, nodeId + '_tomorrow'],
-      }
-
-      return {
-        nodes: {
-          ...state.nodes,
-          ...nodeUpdates,
-          ...newNodes,
-          [tomorrowsId]: updatedTomorrowsCard,
-        },
-      }
+      return { nodes: newNodes }
     })
   },
 
@@ -599,12 +1014,12 @@ export const useStore = create((set, get) => ({
 
       const newNodes = { ...state.nodes }
 
-      // Remove root linked copy from Tomorrow's Tasks card's childrenIds
-      const tomorrowsId = linkedNode.parentId
-      if (tomorrowsId && newNodes[tomorrowsId]) {
-        newNodes[tomorrowsId] = {
-          ...newNodes[tomorrowsId],
-          childrenIds: newNodes[tomorrowsId].childrenIds.filter(c => c !== linkedNodeId),
+      // Remove this copy from its parent's childrenIds
+      const parentId = linkedNode.parentId
+      if (parentId && newNodes[parentId]) {
+        newNodes[parentId] = {
+          ...newNodes[parentId],
+          childrenIds: newNodes[parentId].childrenIds.filter(c => c !== linkedNodeId),
         }
       }
 
@@ -618,7 +1033,7 @@ export const useStore = create((set, get) => ({
       }
       collect(linkedNodeId)
 
-      // Clean up linkedNodeIds on all originals; remove tomorrow label from root original only
+      // Clean up linkedNodeIds on all originals; remove tomorrow label from any original that has it
       toDelete.forEach(tid => {
         const tomorrowCopy = newNodes[tid]
         if (!tomorrowCopy) return
@@ -627,7 +1042,7 @@ export const useStore = create((set, get) => ({
           if (!original) return
           const filteredLinks = original.linkedNodeIds.filter(lid => lid !== tid)
           let { labelIds } = original
-          if (tid === linkedNodeId && state.tomorrowsTasksLabelId) {
+          if (state.tomorrowsTasksLabelId && labelIds.includes(state.tomorrowsTasksLabelId)) {
             labelIds = labelIds.filter(lid => lid !== state.tomorrowsTasksLabelId)
           }
           newNodes[originalId] = { ...original, linkedNodeIds: filteredLinks, labelIds }
@@ -636,6 +1051,30 @@ export const useStore = create((set, get) => ({
 
       // Delete all collected _tomorrow nodes
       toDelete.forEach(tid => delete newNodes[tid])
+
+      // Auto-cleanup: cascade-remove empty auto-group ancestors
+      let checkParentId = parentId
+      while (checkParentId && checkParentId !== state.tomorrowsTasksRootId) {
+        const checkParent = newNodes[checkParentId]
+        if (!checkParent || !checkParent.isAutoGroupNode || checkParent.childrenIds.length > 0) break
+        const grandParentId = checkParent.parentId
+        if (grandParentId && newNodes[grandParentId]) {
+          newNodes[grandParentId] = {
+            ...newNodes[grandParentId],
+            childrenIds: newNodes[grandParentId].childrenIds.filter(c => c !== checkParentId),
+          }
+        }
+        checkParent.linkedNodeIds.forEach(origId => {
+          if (newNodes[origId]) {
+            newNodes[origId] = {
+              ...newNodes[origId],
+              linkedNodeIds: newNodes[origId].linkedNodeIds.filter(lid => lid !== checkParentId),
+            }
+          }
+        })
+        delete newNodes[checkParentId]
+        checkParentId = grandParentId
+      }
 
       return { nodes: newNodes }
     })
@@ -982,8 +1421,9 @@ export const useStore = create((set, get) => ({
             // 3. Create _today copies inline (mirror of linkToTodaysTasks logic)
             const nodeUpdates = {}
             const newTodayNodes = {}
+            const isAutoGroup = tomorrowCopy.isAutoGroupNode ?? false
 
-            function createLinkedTree(srcId, todayParentId) {
+            function createLinkedTree(srcId, todayParentId, topLevel = false) {
               const src = nodeUpdates[srcId] || newNodes[srcId]
               if (!src) return
               const linkedId = srcId + '_today'
@@ -1006,16 +1446,19 @@ export const useStore = create((set, get) => ({
                 isTodaysTask: true,
                 isTomorrowsTask: false,
                 linkedNodeIds: [srcId],
+                isAutoGroupNode: topLevel ? isAutoGroup : false,
               }
             }
 
-            createLinkedTree(originalId, todaysId)
+            createLinkedTree(originalId, todaysId, true)
 
-            // 4. Add Today label to original
-            const origAfterUpdate = nodeUpdates[originalId] || newNodes[originalId]
-            nodeUpdates[originalId] = {
-              ...origAfterUpdate,
-              labelIds: [...new Set([...origAfterUpdate.labelIds, state.todaysTasksLabelId])],
+            // 4. Add Today label to original (only for explicitly-added items, not auto-group nodes)
+            if (!isAutoGroup) {
+              const origAfterUpdate = nodeUpdates[originalId] || newNodes[originalId]
+              nodeUpdates[originalId] = {
+                ...origAfterUpdate,
+                labelIds: [...new Set([...origAfterUpdate.labelIds, state.todaysTasksLabelId])],
+              }
             }
 
             // Merge updates into newNodes
@@ -1071,20 +1514,25 @@ export const useStore = create((set, get) => ({
 
       const yesterdayDate = lastCleanupDate // the date we're archiving
 
-      const allCheckboxDescendantsComplete = (nodeId) => {
+      const allCheckboxDescendantsComplete = (nodeId, skipSelf = false) => {
         const n = newNodes[nodeId]
         if (!n) return true
-        if (n.type === 'CHECKBOX' && n.status !== 'COMPLETED') return false
-        return n.childrenIds.every(allCheckboxDescendantsComplete)
+        if (!skipSelf && n.type === 'CHECKBOX' && n.status !== 'COMPLETED') return false
+        return n.childrenIds.every(cid => allCheckboxDescendantsComplete(cid))
       }
 
       const completed = todaysCard.childrenIds.filter(id => {
         const n = newNodes[id]
-        return n?.status === 'COMPLETED' && allCheckboxDescendantsComplete(id)
+        if (!n) return false
+        // Auto-group nodes are "complete" when all their checkbox descendants are complete
+        if (n.isAutoGroupNode) return allCheckboxDescendantsComplete(id, true)
+        return n.status === 'COMPLETED' && allCheckboxDescendantsComplete(id)
       })
       const incomplete = todaysCard.childrenIds.filter(id => {
         const n = newNodes[id]
-        return n && n.status !== 'COMPLETED'
+        // Auto-group nodes auto-stay (handled transitively); don't show in cleanup modal
+        if (!n || n.isAutoGroupNode) return false
+        return n.status !== 'COMPLETED'
         // root-complete-but-subtasks-open: intentionally in neither bucket → auto-stay
       })
 
@@ -1136,7 +1584,7 @@ export const useStore = create((set, get) => ({
               if (!original) return
               const filteredLinks = original.linkedNodeIds.filter(lid => !toDelete.has(lid))
               let { labelIds } = original
-              if (tid === todayId && state.todaysTasksLabelId) {
+              if (state.todaysTasksLabelId && labelIds.includes(state.todaysTasksLabelId)) {
                 labelIds = labelIds.filter(lid => lid !== state.todaysTasksLabelId)
               }
               newNodes[originalId] = { ...original, linkedNodeIds: filteredLinks, labelIds }
@@ -1238,7 +1686,7 @@ export const useStore = create((set, get) => ({
               if (!orig) return
               const filteredLinks = orig.linkedNodeIds.filter(lid => !toDelete.has(lid))
               let { labelIds } = orig
-              if (tid === todayId && state.todaysTasksLabelId) {
+              if (state.todaysTasksLabelId && labelIds.includes(state.todaysTasksLabelId)) {
                 labelIds = labelIds.filter(lid => lid !== state.todaysTasksLabelId)
               }
               newNodes[oid] = { ...orig, linkedNodeIds: filteredLinks, labelIds }
@@ -1272,7 +1720,7 @@ export const useStore = create((set, get) => ({
               if (!orig) return
               const filteredLinks = orig.linkedNodeIds.filter(lid => !toDelete.has(lid))
               let { labelIds } = orig
-              if (tid === todayId && state.todaysTasksLabelId) {
+              if (state.todaysTasksLabelId && labelIds.includes(state.todaysTasksLabelId)) {
                 labelIds = labelIds.filter(lid => lid !== state.todaysTasksLabelId)
               }
               newNodes[oid] = { ...orig, linkedNodeIds: filteredLinks, labelIds }
