@@ -27,7 +27,6 @@ export default function RootCard({ nodeId }) {
   })
 
   const headerRef = useRef(null)
-  const confirmRef = useRef(null)
   const cardMenuRef = useRef(null)
   const [pendingDelete, setPendingDelete] = useState(false)
   const [showCardMenu, setShowCardMenu] = useState(false)
@@ -36,7 +35,10 @@ export default function RootCard({ nodeId }) {
   const isPinned = !!pinnedCards[nodeId]
 
   useEffect(() => {
-    if (pendingDelete) confirmRef.current?.focus()
+    if (!pendingDelete) return
+    const handler = (e) => { if (e.key === 'Escape') setPendingDelete(false) }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
   }, [pendingDelete])
 
   useEffect(() => {
@@ -142,25 +144,7 @@ export default function RootCard({ nodeId }) {
           {isTomorrow && (
             <span className="text-blue-500 text-xs font-semibold uppercase tracking-wide">Tomorrow</span>
           )}
-          {pendingDelete ? (
-            <div
-              ref={confirmRef}
-              tabIndex={0}
-              className="flex-1 text-sm font-semibold text-red-400 outline-none"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); deleteNode(nodeId) }
-                if (e.key === 'Escape') {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  setPendingDelete(false)
-                  setTimeout(() => headerRef.current?.querySelector('[contenteditable]')?.focus(), 20)
-                }
-              }}
-            >
-              Delete card? ↵ confirm · Esc cancel
-            </div>
-          ) : (
-            <NodeContent
+          <NodeContent
               content={node.content}
               onChange={val => updateNodeContent(nodeId, val)}
               placeholder="Card title…"
@@ -185,7 +169,6 @@ export default function RootCard({ nodeId }) {
                 }
               }}
             />
-          )}
           {/* Drag handle — touch-none scoped here so pinch zoom works on card title area */}
           <span {...listeners} data-testid={`card-handle-${nodeId}`} className="flex-shrink-0 text-zinc-300 dark:text-zinc-600 touch-none" style={{ pointerEvents: 'auto' }} aria-hidden="true">
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
@@ -356,6 +339,43 @@ export default function RootCard({ nodeId }) {
             </button>
           </div>
         </>
+      )}
+
+      {pendingDelete && (
+        <div
+          data-testid="delete-card-modal"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+          onClick={() => setPendingDelete(false)}
+        >
+          <div
+            className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-sm border border-zinc-200 dark:border-zinc-700 p-6 flex flex-col gap-4"
+            onClick={e => e.stopPropagation()}
+          >
+            <div>
+              <h2 className="font-semibold text-zinc-900 dark:text-white">Delete card?</h2>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
+                This will permanently delete &ldquo;{node.content}&rdquo; and all its tasks.
+              </p>
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button
+                data-testid="delete-card-cancel"
+                onClick={() => setPendingDelete(false)}
+                className="px-4 py-2 text-sm rounded-xl font-medium border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                data-testid="delete-card-confirm"
+                autoFocus
+                onClick={() => deleteNode(nodeId)}
+                className="px-4 py-2 text-sm rounded-xl font-medium bg-red-500 text-white hover:bg-red-600 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
