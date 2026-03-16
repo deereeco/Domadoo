@@ -68,6 +68,7 @@ export default function Header() {
         <div className="flex items-center gap-1 justify-end">
           {/* Undo / Redo */}
           <button
+            data-testid="undo-btn"
             onClick={undo}
             disabled={undoStack.length === 0}
             title="Undo (Ctrl+Z)"
@@ -78,6 +79,7 @@ export default function Header() {
             </svg>
           </button>
           <button
+            data-testid="redo-btn"
             onClick={redo}
             disabled={redoStack.length === 0}
             title="Redo (Ctrl+Shift+Z)"
