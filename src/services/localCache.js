@@ -6,7 +6,9 @@ export function saveToCache(state) {
     // eslint-disable-next-line no-unused-vars
     const { user, syncStatus, detailsModalNodeId, showDoneToday, showLabelManager,
             pendingCleanupTasks, showHistory, historyViewDate,
-            nestTargetId, nestZoneActive, ...persist } = state
+            nestTargetId, nestZoneActive,
+            _undoStack, _redoStack, _pendingSnapshot,
+            ...persist } = state
     localStorage.setItem(KEY, JSON.stringify(persist))
   } catch (e) {
     console.warn('Failed to save to localStorage', e)

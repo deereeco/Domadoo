@@ -1,6 +1,6 @@
 import { useRef, useEffect, useCallback } from 'react'
 
-export default function NodeContent({ content, onChange, onKeyDown, className = '', placeholder = 'Note…' }) {
+export default function NodeContent({ content, onChange, onKeyDown, onFocus, onBlur, className = '', placeholder = 'Note…' }) {
   const ref = useRef(null)
 
   // Sync external content changes (e.g. undo)
@@ -22,6 +22,8 @@ export default function NodeContent({ content, onChange, onKeyDown, className = 
       tabIndex={-1}
       onInput={handleInput}
       onKeyDown={onKeyDown}
+      onFocus={onFocus}
+      onBlur={onBlur}
       data-placeholder={placeholder}
       className={`outline-none min-w-0 break-words ${className} empty:before:content-[attr(data-placeholder)] empty:before:text-zinc-400 dark:empty:before:text-zinc-600`}
     />

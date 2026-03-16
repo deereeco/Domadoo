@@ -5,7 +5,9 @@ import { signOut } from '../../services/googleAuth.js'
 import { version } from '../../../package.json'
 
 export default function Header() {
-  const { user, syncStatus, addRootNode, signOut: storeSignOut, isDemoMode, setShowDemoModal, theme, toggleTheme } = useStore()
+  const { user, syncStatus, addRootNode, signOut: storeSignOut, isDemoMode, setShowDemoModal, theme, toggleTheme, undo, redo } = useStore()
+  const undoStack = useStore(s => s._undoStack)
+  const redoStack = useStore(s => s._redoStack)
   const [showHelp, setShowHelp] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [avatarError, setAvatarError] = useState(false)
@@ -64,6 +66,28 @@ export default function Header() {
 
         {/* Right: actions */}
         <div className="flex items-center gap-1 justify-end">
+          {/* Undo / Redo */}
+          <button
+            onClick={undo}
+            disabled={undoStack.length === 0}
+            title="Undo (Ctrl+Z)"
+            className="p-2 rounded-lg transition-colors text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a5 5 0 010 10H9m-6-10l4-4m-4 4l4 4" />
+            </svg>
+          </button>
+          <button
+            onClick={redo}
+            disabled={redoStack.length === 0}
+            title="Redo (Ctrl+Shift+Z)"
+            className="p-2 rounded-lg transition-colors text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10H11a5 5 0 000 10h4m6-10l-4-4m4 4l-4 4" />
+            </svg>
+          </button>
+
           {/* Settings gear */}
           <div className="relative" ref={settingsRef}>
             <button

@@ -108,7 +108,7 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
           toggleLabelOnNode, deleteNode, openDetailsModal, addChildNode, dragMode,
           linkToTodaysTasks, unlinkFromTodaysTasks, todaysTasksRootId,
           linkToTomorrowsTasks, unlinkFromTomorrowsTasks, tomorrowsTasksRootId,
-          markCompleteInPast } = useStore()
+          markCompleteInPast, beginContentEdit, commitContentEdit } = useStore()
   const nodes = useStore(s => s.nodes)
 
   const visibility = useNodeVisibility()
@@ -327,6 +327,8 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
             content={node.content}
             onChange={(val) => updateNodeContent(nodeId, val)}
             onKeyDown={handleKeyDown}
+            onFocus={() => beginContentEdit(nodeId)}
+            onBlur={() => commitContentEdit(nodeId)}
             placeholder={depth === 0 ? 'Task…' : 'Sub-task…'}
             className={`text-sm text-zinc-800 dark:text-zinc-100 leading-relaxed ${
               isCompleted ? 'line-through text-zinc-400 dark:text-zinc-600' : ''

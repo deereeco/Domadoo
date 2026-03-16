@@ -39,6 +39,10 @@ const DEFAULT_STATE = {
   // Card UI state (ephemeral)
   collapsedCards: {},    // { [nodeId]: true }
   pinnedCards: {},       // { [nodeId]: true }
+  // Undo / redo (ephemeral, session only)
+  _undoStack: [],        // [{nodes, rootOrder}] — max 50
+  _redoStack: [],        // [{nodes, rootOrder}]
+  _pendingSnapshot: null, // {nodes, rootOrder, nodeId} captured on content focus
 }
 
 export const useStore = create((set, get) => ({
@@ -49,6 +53,61 @@ export const useStore = create((set, get) => ({
     // Ensure system labels always exist (backward compat with old saves)
     const labels = { ...data.labels, [SYSTEM_TODAY_LABEL_ID]: SYSTEM_TODAY_LABEL, [SYSTEM_TOMORROW_LABEL_ID]: SYSTEM_TOMORROW_LABEL }
     set({ ...DEFAULT_STATE, ...data, labels, todaysTasksLabelId: SYSTEM_TODAY_LABEL_ID, tomorrowsTasksLabelId: SYSTEM_TOMORROW_LABEL_ID })
+  },
+
+  // ── Undo / Redo ────────────────────────────────────────────────────────────
+  _pushSnapshot() {
+    const { nodes, rootOrder } = get()
+    set(s => ({
+      _undoStack: [...s._undoStack, { nodes, rootOrder }].slice(-50),
+      _redoStack: [],
+    }))
+  },
+
+  beginContentEdit(nodeId) {
+    const { nodes, rootOrder } = get()
+    set({ _pendingSnapshot: { nodes, rootOrder, nodeId } })
+  },
+
+  commitContentEdit(nodeId) {
+    const { _pendingSnapshot, nodes } = get()
+    if (!_pendingSnapshot || _pendingSnapshot.nodeId !== nodeId) return
+    const before = _pendingSnapshot.nodes[nodeId]?.content
+    const after = nodes[nodeId]?.content
+    if (before !== after) {
+      const snap = _pendingSnapshot
+      set(s => ({
+        _undoStack: [...s._undoStack, { nodes: snap.nodes, rootOrder: snap.rootOrder }].slice(-50),
+        _redoStack: [],
+      }))
+    }
+    set({ _pendingSnapshot: null })
+  },
+
+  undo() {
+    set(s => {
+      if (s._undoStack.length === 0) return {}
+      const snapshot = s._undoStack[s._undoStack.length - 1]
+      return {
+        nodes: snapshot.nodes,
+        rootOrder: snapshot.rootOrder,
+        _undoStack: s._undoStack.slice(0, -1),
+        _redoStack: [...s._redoStack, { nodes: s.nodes, rootOrder: s.rootOrder }],
+      }
+    })
+  },
+
+  redo() {
+    set(s => {
+      if (s._redoStack.length === 0) return {}
+      const snapshot = s._redoStack[s._redoStack.length - 1]
+      return {
+        nodes: snapshot.nodes,
+        rootOrder: snapshot.rootOrder,
+        _redoStack: s._redoStack.slice(0, -1),
+        _undoStack: [...s._undoStack, { nodes: s.nodes, rootOrder: s.rootOrder }],
+      }
+    })
   },
 
   // ── Drag Mode ──────────────────────────────────────────────────────────────
@@ -81,6 +140,7 @@ export const useStore = create((set, get) => ({
 
   // ── Node CRUD ──────────────────────────────────────────────────────────────
   addRootNode() {
+    get()._pushSnapshot()
     const node = createNode({ parentId: null })
     set(state => ({
       nodes: { ...state.nodes, [node.id]: node },
@@ -123,6 +183,7 @@ export const useStore = create((set, get) => ({
   },
 
   addChildNode(parentId, afterId = null) {
+    get()._pushSnapshot()
     const node = createNode({ parentId })
     set(state => {
       const parent = state.nodes[parentId]
@@ -231,6 +292,7 @@ export const useStore = create((set, get) => ({
   },
 
   toggleComplete(id) {
+    get()._pushSnapshot()
     set(state => {
       const node = state.nodes[id]
       if (!node) return {}
@@ -277,6 +339,7 @@ export const useStore = create((set, get) => ({
   },
 
   deleteNode(id, { deleteLinked = false } = {}) {
+    get()._pushSnapshot()
     set(state => {
       const node = state.nodes[id]
       if (!node) return {}
@@ -350,6 +413,7 @@ export const useStore = create((set, get) => ({
 
   // ── Drag & Drop ────────────────────────────────────────────────────────────
   moveNode({ nodeId, newParentId, newIndex }) {
+    get()._pushSnapshot()
     set(state => {
       const node = state.nodes[nodeId]
       if (!node) return {}
@@ -384,6 +448,7 @@ export const useStore = create((set, get) => ({
   },
 
   reorderRootCards(oldIndex, newIndex) {
+    get()._pushSnapshot()
     set(state => {
       const newRootOrder = [...state.rootOrder]
       const [moved] = newRootOrder.splice(oldIndex, 1)
@@ -393,6 +458,7 @@ export const useStore = create((set, get) => ({
   },
 
   reorderChildren(parentId, oldIndex, newIndex) {
+    get()._pushSnapshot()
     set(state => {
       const parent = state.nodes[parentId]
       if (!parent) return {}

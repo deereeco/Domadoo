@@ -13,6 +13,7 @@ const SHORTCUTS = {
   'D':          { label: 'Open details', ctx: 'Ctrl+D' },
   'L':          { label: 'Assign label', ctx: 'Ctrl+L' },
   'N':          { label: 'New card', ctx: 'Ctrl+Shift+N' },
+  'Z':          { label: 'Undo / Redo', ctx: 'Ctrl+Z / Ctrl+Shift+Z' },
 }
 
 const KEYBOARD_ROWS = [
