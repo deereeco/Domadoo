@@ -13,9 +13,11 @@ import LabelManager from './components/Labels/LabelManager.jsx'
 import DayCleanupModal from './components/DayCleanupModal.jsx'
 import DemoModal from './components/DemoModal.jsx'
 
-function todayString() {
-  return new Date().toISOString().split('T')[0]
+function localDateString(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
+// Computed once at module load — stable for the whole session even if TZ changes while traveling
+const sessionToday = localDateString()
 
 export default function App() {
   const {
@@ -45,14 +47,14 @@ export default function App() {
       seedDemoTodaysTasks()
     }
     const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1)
-    initCleanupDate(yesterday.toISOString().split('T')[0])
+    initCleanupDate(localDateString(yesterday))
     runDailyCleanup()
   }, [])
 
   // Daily cleanup check — extracted so it can be called after Drive hydration too
   const runCleanupCheck = () => {
     const state = useStore.getState()
-    const today = todayString()
+    const today = sessionToday
     if (!state.lastCleanupDate) {
       state.initCleanupDate(today)
       return
