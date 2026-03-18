@@ -128,7 +128,7 @@ export default function Header() {
                   onClick={() => { setShowSettings(false); setShowHelp(true) }}
                   className="w-full text-left px-3 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
                 >
-                  ? Shortcuts
+                  ⌨ Keyboard Shortcuts
                 </button>
 
                 <button

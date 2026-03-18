@@ -46,9 +46,10 @@ export default function KeyboardShortcutsHelp({ onClose }) {
   }, [onClose])
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div
-        ref={ref}
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50 backdrop-blur-sm">
+      <div className="flex min-h-full items-center justify-center p-4">
+        <div
+          ref={ref}
         data-testid="keyboard-help-popover"
         className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-2xl shadow-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
       >
@@ -123,6 +124,7 @@ export default function KeyboardShortcutsHelp({ onClose }) {
               <span className="text-xs text-zinc-500 dark:text-zinc-400">{ctx !== key ? `${ctx} — ` : ''}{label}</span>
             </div>
           ))}
+        </div>
         </div>
       </div>
     </div>
