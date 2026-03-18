@@ -70,27 +70,27 @@ export default function DayCleanupModal() {
                   <div className="flex gap-2 ml-5">
                     <button
                       onClick={() => resolveCleanupTask(task.id, 'today')}
-                      title="Keep for today"
+                      title="Leave in today's list"
                       data-testid={`cleanup-action-today-${task.id}`}
                       className={buttonClass(task.resolved === 'today')}
                     >
-                      → Today
+                      Keep for today
                     </button>
                     <button
                       onClick={() => resolveCleanupTask(task.id, 'complete')}
-                      title="Mark as completed"
+                      title="Mark as done and archive to yesterday"
                       data-testid={`cleanup-action-complete-${task.id}`}
                       className={buttonClass(task.resolved === 'complete')}
                     >
-                      ✓ Done
+                      Done (archive)
                     </button>
                     <button
                       onClick={() => resolveCleanupTask(task.id, 'pushback')}
-                      title="Return to original card"
+                      title="Remove from today and return to its source card"
                       data-testid={`cleanup-action-pushback-${task.id}`}
                       className={buttonClass(task.resolved === 'pushback')}
                     >
-                      ↩ Push back
+                      Return to original card
                     </button>
                   </div>
                 </div>
@@ -118,27 +118,27 @@ export default function DayCleanupModal() {
                   <div className="flex gap-2 ml-5">
                     <button
                       onClick={() => resolveCleanupTask(task.id, 'repeat')}
-                      title="Keep for today, unchecked"
+                      title="Reset to incomplete and keep in today's list"
                       data-testid={`cleanup-action-repeat-${task.id}`}
                       className={buttonClass(task.resolved === 'repeat')}
                     >
-                      ↺ Repeat
+                      Repeat
                     </button>
                     <button
                       onClick={() => resolveCleanupTask(task.id, 'remove')}
-                      title="Archive and remove from today"
+                      title="Archive as completed and remove from today"
                       data-testid={`cleanup-action-remove-${task.id}`}
                       className={buttonClass(task.resolved === 'remove')}
                     >
-                      ✓ Remove
+                      Done (archive)
                     </button>
                     <button
                       onClick={() => resolveCleanupTask(task.id, 'pushback')}
-                      title="Return to original card as incomplete"
+                      title="Remove from today and return to its source card as incomplete"
                       data-testid={`cleanup-action-pushback-${task.id}`}
                       className={buttonClass(task.resolved === 'pushback')}
                     >
-                      ↩ Push back
+                      Return to original card
                     </button>
                   </div>
                 </div>
@@ -156,13 +156,13 @@ export default function DayCleanupModal() {
                   onClick={() => handleApplyAll('today', false)}
                   className="px-3 py-1.5 text-xs rounded-lg font-medium border border-zinc-300 dark:border-zinc-600 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
                 >
-                  All → Today
+                  All: Keep for today
                 </button>
                 <button
                   onClick={() => handleApplyAll('pushback', false)}
                   className="px-3 py-1.5 text-xs rounded-lg font-medium border border-zinc-300 dark:border-zinc-600 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
                 >
-                  All ↩ Back
+                  All: Return to original card
                 </button>
               </>
             )}
@@ -172,13 +172,13 @@ export default function DayCleanupModal() {
                   onClick={() => handleApplyAll('repeat', true)}
                   className="px-3 py-1.5 text-xs rounded-lg font-medium border border-zinc-300 dark:border-zinc-600 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
                 >
-                  All ↺ Repeat
+                  All: Repeat
                 </button>
                 <button
                   onClick={() => handleApplyAll('remove', true)}
                   className="px-3 py-1.5 text-xs rounded-lg font-medium border border-zinc-300 dark:border-zinc-600 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
                 >
-                  All ✓ Remove
+                  All: Done (archive)
                 </button>
               </>
             )}
