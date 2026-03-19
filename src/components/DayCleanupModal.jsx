@@ -55,6 +55,7 @@ export default function DayCleanupModal() {
               <p className="text-xs text-zinc-400 mt-0.5">{buildSubtitle()}</p>
             </div>
             <button
+              data-testid="cleanup-peek-btn"
               onClick={enterPeekMode}
               title="Peek at your board for context"
               className="flex-shrink-0 flex items-center gap-1 px-2 py-1 text-xs rounded-md text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"

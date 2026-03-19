@@ -90,11 +90,12 @@ export const MOCK_STATE = {
   nestZoneActive: false,
 }
 
-// Returns 'YYYY-MM-DD' for today or an offset (negative = past)
+// Returns 'YYYY-MM-DD' in LOCAL timezone for today or an offset (negative = past).
+// Must match App.jsx's localDateString() which also uses local time — not UTC.
 export function isoDate(offsetDays = 0) {
   const d = new Date()
   d.setDate(d.getDate() + offsetDays)
-  return d.toISOString().split('T')[0]
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 // A state with Today's Tasks card containing one completed and one incomplete linked task

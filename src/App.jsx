@@ -56,7 +56,7 @@ export default function App() {
   const runCleanupCheck = () => {
     const state = useStore.getState()
     const today = sessionToday
-    if (!state.lastCleanupDate) {
+if (!state.lastCleanupDate) {
       state.initCleanupDate(today)
       return
     }
