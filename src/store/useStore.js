@@ -30,6 +30,8 @@ const DEFAULT_STATE = {
   history: [],           // DaySnapshot[]  (persisted)
   lastCleanupDate: null, // 'YYYY-MM-DD'   (persisted)
   pendingCleanupTasks: null, // [{id, content, originalId, resolved}] | null (ephemeral)
+  isPeeking: false,      // bool (ephemeral) — board peek mode during cleanup
+  peekCardIds: null,     // Set<string> | null — card IDs locked during peek
   showHistory: false,    // bool (ephemeral)
   historyViewDate: null, // 'YYYY-MM-DD' | null (ephemeral)
   showDemoModal: false,  // bool (ephemeral)
@@ -1321,6 +1323,13 @@ export const useStore = create((set, get) => ({
   },
 
   // ── Daily Cleanup & History ─────────────────────────────────────────────────
+  enterPeekMode() {
+    set(s => ({ isPeeking: true, peekCardIds: new Set(s.rootOrder) }))
+  },
+  exitPeekMode() {
+    set({ isPeeking: false, peekCardIds: null })
+  },
+
   setShowHistory(val) {
     set({ showHistory: val })
   },
@@ -1809,6 +1818,8 @@ export const useStore = create((set, get) => ({
         history: newHistory,
         lastCleanupDate: today,
         pendingCleanupTasks: null,
+        isPeeking: false,
+        peekCardIds: null,
       }
     })
   },

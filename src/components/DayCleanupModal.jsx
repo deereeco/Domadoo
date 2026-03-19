@@ -1,9 +1,10 @@
 import { useStore } from '../store/useStore.js'
 
 export default function DayCleanupModal() {
-  const { pendingCleanupTasks, resolveCleanupTask, finalizeDayCleanup, lastCleanupDate } = useStore()
+  const { pendingCleanupTasks, resolveCleanupTask, finalizeDayCleanup, lastCleanupDate, isPeeking, enterPeekMode } = useStore()
 
   if (!pendingCleanupTasks || pendingCleanupTasks.length === 0) return null
+  if (isPeeking) return null
 
   const allResolved = pendingCleanupTasks.every(t => t.resolved !== null)
 
@@ -48,8 +49,23 @@ export default function DayCleanupModal() {
       >
         {/* Header */}
         <div className="px-6 py-4 border-b border-zinc-100 dark:border-zinc-800">
-          <h2 className="font-semibold text-zinc-900 dark:text-white">New day — tasks to review</h2>
-          <p className="text-xs text-zinc-400 mt-0.5">{buildSubtitle()}</p>
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <h2 className="font-semibold text-zinc-900 dark:text-white">New day — tasks to review</h2>
+              <p className="text-xs text-zinc-400 mt-0.5">{buildSubtitle()}</p>
+            </div>
+            <button
+              onClick={enterPeekMode}
+              title="Peek at your board for context"
+              className="flex-shrink-0 flex items-center gap-1 px-2 py-1 text-xs rounded-md text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+              Peek
+            </button>
+          </div>
         </div>
 
         {/* Task list */}

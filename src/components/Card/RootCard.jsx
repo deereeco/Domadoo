@@ -8,7 +8,7 @@ import NodeItem from '../Node/NodeItem.jsx'
 import NodeContent from '../Node/NodeContent.jsx'
 import LabelAssigner from '../Labels/LabelAssigner.jsx'
 
-export default function RootCard({ nodeId }) {
+export default function RootCard({ nodeId, peekLocked = false }) {
   const node = useStore(s => s.nodes[nodeId])
   const { updateNodeContent, addChildNode, deleteNode, updateNode, dragMode,
           toggleLabelOnNode, todaysTasksLabelId, tomorrowsTasksLabelId,
@@ -19,6 +19,7 @@ export default function RootCard({ nodeId }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: nodeId,
     data: { type: 'card', nodeId },
+    disabled: peekLocked,
   })
 
   const { setNodeRef: setDropRef, isOver } = useDroppable({
@@ -77,14 +78,17 @@ export default function RootCard({ nodeId }) {
       style={style}
       data-nodeid={nodeId}
       data-testid={isToday ? 'today-tasks-card' : isTomorrow ? 'tomorrow-tasks-card' : `card-${nodeId}`}
-      className={`break-inside-avoid mb-4 rounded-2xl border transition-shadow ${
+      className={`relative break-inside-avoid mb-4 rounded-2xl border transition-shadow ${
         isToday
           ? 'border-amber-300 dark:border-amber-600 bg-amber-50/60 dark:bg-amber-950/30'
           : isTomorrow
             ? 'border-blue-300 dark:border-blue-700 bg-blue-50/60 dark:bg-blue-950/30'
             : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900'
-      } ${isOver ? 'ring-2 ring-indigo-400' : ''} shadow-sm hover:shadow-md`}
+      } ${isOver ? 'ring-2 ring-indigo-400' : ''} shadow-sm hover:shadow-md ${peekLocked ? 'opacity-60' : ''}`}
     >
+      {/* Peek mode overlay — blocks all interaction on existing cards */}
+      {peekLocked && <div className="absolute inset-0 z-10 rounded-2xl cursor-not-allowed" />}
+
       {/* Card Header — listeners scoped to drag handle icon so touch-none doesn't block pinch zoom on the title */}
       <div
         {...attributes}

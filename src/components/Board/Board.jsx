@@ -34,7 +34,7 @@ function BoardDropZone({ activeDragType }) {
 }
 
 export default function Board() {
-  const { rootOrder, nodes, addRootNode, moveNode, reorderRootCards, reorderChildren, dragMode, linkToTodaysTasks, todaysTasksRootId, setNestTarget, clearNestTarget, setNestZoneActive, historyViewDate, pinnedCards } = useStore()
+  const { rootOrder, nodes, addRootNode, moveNode, reorderRootCards, reorderChildren, dragMode, linkToTodaysTasks, todaysTasksRootId, setNestTarget, clearNestTarget, setNestZoneActive, historyViewDate, pinnedCards, isPeeking, peekCardIds } = useStore()
   useBoardKeyNav()
 
   const [activeDragType, setActiveDragType] = useState(null)
@@ -263,7 +263,7 @@ export default function Board() {
             <SortableContext items={pinnedIds} strategy={rectSortingStrategy}>
               <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4">
                 {pinnedIds.map(id => (
-                  <RootCard key={id} nodeId={id} />
+                  <RootCard key={id} nodeId={id} peekLocked={isPeeking && !!peekCardIds?.has(id)} />
                 ))}
               </div>
             </SortableContext>
@@ -275,7 +275,7 @@ export default function Board() {
         <SortableContext items={unpinnedIds} strategy={rectSortingStrategy}>
           <div data-testid="card-list" className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4">
             {unpinnedIds.map(id => (
-              <RootCard key={id} nodeId={id} />
+              <RootCard key={id} nodeId={id} peekLocked={isPeeking && !!peekCardIds?.has(id)} />
             ))}
           </div>
         </SortableContext>

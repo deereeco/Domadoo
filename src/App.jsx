@@ -11,6 +11,7 @@ import Board from './components/Board/Board.jsx'
 import DetailsModal from './components/DetailsModal/DetailsModal.jsx'
 import LabelManager from './components/Labels/LabelManager.jsx'
 import DayCleanupModal from './components/DayCleanupModal.jsx'
+import PeekBanner from './components/PeekBanner.jsx'
 import DemoModal from './components/DemoModal.jsx'
 
 function localDateString(d = new Date()) {
@@ -25,7 +26,7 @@ export default function App() {
     detailsModalNodeId, showLabelManager, theme,
     lastCleanupDate, todaysTasksRootId,
     initCleanupDate, runDailyCleanup, seedDemoTodaysTasks,
-    pendingCleanupTasks, showDemoModal, setShowDemoModal,
+    pendingCleanupTasks, isPeeking, showDemoModal, setShowDemoModal,
     dragMode, toggleDragMode,
   } = useStore()
   useDebugConsole()
@@ -127,6 +128,7 @@ export default function App() {
       {detailsModalNodeId && <DetailsModal />}
       {showLabelManager && <LabelManager />}
       {pendingCleanupTasks && pendingCleanupTasks.length > 0 && <DayCleanupModal />}
+      {isPeeking && pendingCleanupTasks && pendingCleanupTasks.length > 0 && <PeekBanner />}
       {showDemoModal && <DemoModal onClose={() => setShowDemoModal(false)} />}
 
       {/* Floating Drag Mode FAB */}
