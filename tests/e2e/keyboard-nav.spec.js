@@ -109,11 +109,10 @@ test.describe('Arrow key navigation within a card', () => {
     expect(await focusedTestId(page)).toBe(`card-header-${IDS.CARD_A}`)
   })
 
-  test('↓ from last task stays put (no wrap)', async ({ page }) => {
+  test('↓ from last task in card jumps to next card header', async ({ page }) => {
     await focusEl(page, `node-${IDS.TASK_A2}`)
     await page.keyboard.press('ArrowDown')
-    // Still on TASK_A2 — bottom of card, no next task
-    expect(await focusedTestId(page)).toBe(`node-${IDS.TASK_A2}`)
+    expect(await focusedTestId(page)).toBe(`card-header-${IDS.CARD_B}`)
   })
 
   test('Tab from a task jumps to next card header', async ({ page }) => {
@@ -252,6 +251,49 @@ test.describe('Ctrl+Shift+N — new card', () => {
     await page.keyboard.press('Control+Shift+N')
     await page.waitForTimeout(100)
     expect(await isContentEditableFocused(page)).toBe(true)
+  })
+})
+
+// ─── Arrow navigation bug fixes (issue #44) ───────────────────────────────
+
+test.describe('Arrow navigation bug fixes', () => {
+  test('→ on card header focuses next card header', async ({ page }) => {
+    await focusEl(page, `card-header-${IDS.CARD_A}`)
+    await page.keyboard.press('ArrowRight')
+    expect(await focusedTestId(page)).toBe(`card-header-${IDS.CARD_B}`)
+  })
+
+  test('← on card header focuses prev card header', async ({ page }) => {
+    await focusEl(page, `card-header-${IDS.CARD_B}`)
+    await page.keyboard.press('ArrowLeft')
+    expect(await focusedTestId(page)).toBe(`card-header-${IDS.CARD_A}`)
+  })
+
+  test('→ on last card header does nothing (no wrap)', async ({ page }) => {
+    await focusEl(page, `card-header-${IDS.CARD_B}`)
+    await page.keyboard.press('ArrowRight')
+    expect(await focusedTestId(page)).toBe(`card-header-${IDS.CARD_B}`)
+  })
+
+  test('← on first card header does nothing (no wrap)', async ({ page }) => {
+    await focusEl(page, `card-header-${IDS.CARD_A}`)
+    await page.keyboard.press('ArrowLeft')
+    expect(await focusedTestId(page)).toBe(`card-header-${IDS.CARD_A}`)
+  })
+
+  test('↓ on parent with expanded subtask enters first child (no stuck)', async ({ page }) => {
+    await indentA2UnderA1(page)
+    await focusEl(page, `node-${IDS.TASK_A1}`)
+    await page.keyboard.press('ArrowDown')
+    expect(await focusedTestId(page)).toBe(`node-${IDS.TASK_A2}`)
+  })
+
+  test('↓ on last subtask exits card to next card header (bubbling fix)', async ({ page }) => {
+    await indentA2UnderA1(page)
+    // TASK_A2 is now the only child of TASK_A1 and the last node in CARD_A
+    await focusEl(page, `node-${IDS.TASK_A2}`)
+    await page.keyboard.press('ArrowDown')
+    expect(await focusedTestId(page)).toBe(`card-header-${IDS.CARD_B}`)
   })
 })
 

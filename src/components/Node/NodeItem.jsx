@@ -160,7 +160,7 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
   const CARD_SEL = '[data-testid^="card-"]:not([data-testid^="card-h"]):not([data-testid="card-list"])'
 
   const handleWrapperKeyDown = useCallback((e) => {
-    if (e.target.contentEditable === 'true') return
+    if (e.target !== e.currentTarget) return
 
     // ↑ / ↓ — move within same card
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
@@ -170,7 +170,13 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
       const nodes = [...cardEl.querySelectorAll('[data-testid^="node-"]:not([data-testid^="node-handle-"])')]
       const idx = nodes.indexOf(e.currentTarget)
       if (e.key === 'ArrowDown') {
-        nodes[idx + 1]?.focus()
+        if (nodes[idx + 1]) {
+          nodes[idx + 1].focus()
+        } else {
+          const cards = [...document.querySelectorAll(CARD_SEL)]
+          const cardIdx = cards.indexOf(cardEl)
+          cards[cardIdx + 1]?.querySelector('[data-testid^="card-header-"]')?.focus()
+        }
       } else {
         if (idx > 0) nodes[idx - 1].focus()
         else cardEl.querySelector('[data-testid^="card-header-"]')?.focus()

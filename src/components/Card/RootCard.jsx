@@ -109,6 +109,26 @@ export default function RootCard({ nodeId, peekLocked = false }) {
             return
           }
 
+          // → — focus next card header
+          if (e.key === 'ArrowRight') {
+            e.preventDefault()
+            const cards = [...document.querySelectorAll(CARD_SEL)]
+            const cardEl = e.currentTarget.closest(CARD_SEL)
+            const cardIdx = cards.indexOf(cardEl)
+            cards[cardIdx + 1]?.querySelector('[data-testid^="card-header-"]')?.focus()
+            return
+          }
+
+          // ← — focus prev card header
+          if (e.key === 'ArrowLeft') {
+            e.preventDefault()
+            const cards = [...document.querySelectorAll(CARD_SEL)]
+            const cardEl = e.currentTarget.closest(CARD_SEL)
+            const cardIdx = cards.indexOf(cardEl)
+            cards[cardIdx - 1]?.querySelector('[data-testid^="card-header-"]')?.focus()
+            return
+          }
+
           // ↓ — focus first task in this card
           if (e.key === 'ArrowDown') {
             e.preventDefault()
