@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { useStore } from '../../store/useStore.js'
@@ -117,10 +118,13 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
 
   const [showLabelAssigner, setShowLabelAssigner] = useState(false)
   const [showNodeMenu, setShowNodeMenu] = useState(false)
+  const [nodeMenuPos, setNodeMenuPos] = useState(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showDatePicker, setShowDatePicker] = useState(false)
   const datePickerRef = useRef(null)
   const menuRef = useRef(null)
+  const menuBtnRef = useRef(null)
+  const menuDropdownRef = useRef(null)
   const nodeRef = useRef(null)
 
   useEffect(() => {
@@ -135,7 +139,7 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
   useEffect(() => {
     if (!showNodeMenu) return
     const handler = (e) => {
-      if (!menuRef.current?.contains(e.target)) setShowNodeMenu(false)
+      if (!menuBtnRef.current?.contains(e.target) && !menuDropdownRef.current?.contains(e.target)) setShowNodeMenu(false)
     }
     document.addEventListener('pointerdown', handler)
     return () => document.removeEventListener('pointerdown', handler)
@@ -377,8 +381,16 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
         {/* Node actions — single ... button on hover, opens overflow menu */}
         <div ref={menuRef} className={`relative flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity ${showNodeMenu || showLabelAssigner || showDatePicker ? '!opacity-100' : ''}`}>
           <button
+            ref={menuBtnRef}
             tabIndex={-1}
-            onClick={() => setShowNodeMenu(v => !v)}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => {
+              if (!showNodeMenu && menuBtnRef.current) {
+                const rect = menuBtnRef.current.getBoundingClientRect()
+                setNodeMenuPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
+              }
+              setShowNodeMenu(v => !v)
+            }}
             className="p-1 rounded text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700"
             title="Actions"
           >
@@ -386,120 +398,6 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
               <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
             </svg>
           </button>
-
-          {showNodeMenu && (
-            <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg shadow-lg bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 py-1">
-              <button
-                tabIndex={-1}
-                onClick={() => { addChildNode(nodeId); useStore.getState().updateNode(nodeId, { uiState: { ...node.uiState, isExpanded: true } }); setShowNodeMenu(false) }}
-                className="flex items-center gap-2 px-3 py-1.5 text-xs text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 w-full text-left"
-              >
-                <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v14M5 12h14" />
-                </svg>
-                Add sub-item
-              </button>
-
-              <button
-                tabIndex={-1}
-                onClick={() => { toggleNodeType(nodeId); setShowNodeMenu(false) }}
-                className="flex items-center gap-2 px-3 py-1.5 text-xs text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 w-full text-left"
-              >
-                {node.type === 'CHECKBOX' ? (
-                  <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <circle cx="12" cy="12" r="4" strokeWidth={2} />
-                  </svg>
-                ) : (
-                  <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <rect x="4" y="4" width="16" height="16" rx="3" strokeWidth={2} />
-                  </svg>
-                )}
-                {node.type === 'CHECKBOX' ? 'Switch to bullet' : 'Switch to checkbox'}
-              </button>
-
-              <button
-                tabIndex={-1}
-                onClick={() => { setShowNodeMenu(false); setShowLabelAssigner(true) }}
-                className="flex items-center gap-2 px-3 py-1.5 text-xs text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 w-full text-left"
-              >
-                <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                </svg>
-                Label
-              </button>
-
-              <button
-                tabIndex={-1}
-                onClick={() => { openDetailsModal(nodeId); setShowNodeMenu(false) }}
-                className="flex items-center gap-2 px-3 py-1.5 text-xs text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 w-full text-left"
-              >
-                <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
-                </svg>
-                Details
-              </button>
-
-              {canAddToToday && (
-                <button
-                  tabIndex={-1}
-                  onClick={() => { linkToTodaysTasks(nodeId); setShowNodeMenu(false) }}
-                  className="flex items-center gap-2 px-3 py-1.5 text-xs text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 w-full text-left"
-                >
-                  <svg className="w-3.5 h-3.5 flex-shrink-0 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <circle cx="12" cy="12" r="4" strokeWidth={2} />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
-                  </svg>
-                  Add to Today
-                </button>
-              )}
-
-              {canAddToTomorrow && (
-                <button
-                  tabIndex={-1}
-                  data-testid={`tomorrow-btn-${nodeId}`}
-                  onClick={() => { linkToTomorrowsTasks(nodeId); setShowNodeMenu(false) }}
-                  className="flex items-center gap-2 px-3 py-1.5 text-xs text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 w-full text-left"
-                >
-                  <svg className="w-3.5 h-3.5 flex-shrink-0 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
-                  </svg>
-                  Add to Tomorrow
-                </button>
-              )}
-
-              <button
-                tabIndex={-1}
-                onClick={() => { setShowNodeMenu(false); setShowDatePicker(true) }}
-                className="flex items-center gap-2 px-3 py-1.5 text-xs text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 w-full text-left"
-              >
-                <svg className="w-3.5 h-3.5 flex-shrink-0 text-indigo-500" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <rect x="3" y="4" width="18" height="18" rx="2" strokeWidth={2} />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 2v4M8 2v4M3 10h18" />
-                </svg>
-                Mark complete in past
-              </button>
-
-              <div className="my-1 border-t border-zinc-100 dark:border-zinc-700" />
-
-              <button
-                tabIndex={-1}
-                onClick={() => {
-                  setShowNodeMenu(false)
-                  if (hasLinkedRelationship) {
-                    setShowDeleteConfirm(true)
-                  } else {
-                    deleteNode(nodeId)
-                  }
-                }}
-                className="flex items-center gap-2 px-3 py-1.5 text-xs text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 w-full text-left"
-              >
-                <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-                Delete
-              </button>
-            </div>
-          )}
 
           {showLabelAssigner && (
             <LabelAssigner nodeId={nodeId} onClose={() => setShowLabelAssigner(false)} />
@@ -514,6 +412,125 @@ export default function NodeItem({ nodeId, parentId, depth = 0, focusNode }) {
             )}
           </div>
         </div>
+
+        {showNodeMenu && nodeMenuPos && createPortal(
+          <div
+            ref={menuDropdownRef}
+            style={{ position: 'fixed', top: nodeMenuPos.top, right: nodeMenuPos.right, zIndex: 9999 }}
+            className="w-48 rounded-lg shadow-lg bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 py-1"
+          >
+            <button
+              tabIndex={-1}
+              onClick={() => { addChildNode(nodeId); useStore.getState().updateNode(nodeId, { uiState: { ...node.uiState, isExpanded: true } }); setShowNodeMenu(false) }}
+              className="flex items-center gap-2 px-3 py-1.5 text-xs text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 w-full text-left"
+            >
+              <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v14M5 12h14" />
+              </svg>
+              Add sub-item
+            </button>
+
+            <button
+              tabIndex={-1}
+              onClick={() => { toggleNodeType(nodeId); setShowNodeMenu(false) }}
+              className="flex items-center gap-2 px-3 py-1.5 text-xs text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 w-full text-left"
+            >
+              {node.type === 'CHECKBOX' ? (
+                <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <circle cx="12" cy="12" r="4" strokeWidth={2} />
+                </svg>
+              ) : (
+                <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <rect x="4" y="4" width="16" height="16" rx="3" strokeWidth={2} />
+                </svg>
+              )}
+              {node.type === 'CHECKBOX' ? 'Switch to bullet' : 'Switch to checkbox'}
+            </button>
+
+            <button
+              tabIndex={-1}
+              onClick={() => { setShowNodeMenu(false); setShowLabelAssigner(true) }}
+              className="flex items-center gap-2 px-3 py-1.5 text-xs text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 w-full text-left"
+            >
+              <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+              </svg>
+              Label
+            </button>
+
+            <button
+              tabIndex={-1}
+              onClick={() => { openDetailsModal(nodeId); setShowNodeMenu(false) }}
+              className="flex items-center gap-2 px-3 py-1.5 text-xs text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 w-full text-left"
+            >
+              <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
+              </svg>
+              Details
+            </button>
+
+            {canAddToToday && (
+              <button
+                tabIndex={-1}
+                onClick={() => { linkToTodaysTasks(nodeId); setShowNodeMenu(false) }}
+                className="flex items-center gap-2 px-3 py-1.5 text-xs text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 w-full text-left"
+              >
+                <svg className="w-3.5 h-3.5 flex-shrink-0 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <circle cx="12" cy="12" r="4" strokeWidth={2} />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+                </svg>
+                Add to Today
+              </button>
+            )}
+
+            {canAddToTomorrow && (
+              <button
+                tabIndex={-1}
+                data-testid={`tomorrow-btn-${nodeId}`}
+                onClick={() => { linkToTomorrowsTasks(nodeId); setShowNodeMenu(false) }}
+                className="flex items-center gap-2 px-3 py-1.5 text-xs text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 w-full text-left"
+              >
+                <svg className="w-3.5 h-3.5 flex-shrink-0 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
+                </svg>
+                Add to Tomorrow
+              </button>
+            )}
+
+            <button
+              tabIndex={-1}
+              onClick={() => { setShowNodeMenu(false); setShowDatePicker(true) }}
+              className="flex items-center gap-2 px-3 py-1.5 text-xs text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 w-full text-left"
+            >
+              <svg className="w-3.5 h-3.5 flex-shrink-0 text-indigo-500" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <rect x="3" y="4" width="18" height="18" rx="2" strokeWidth={2} />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 2v4M8 2v4M3 10h18" />
+              </svg>
+              Mark complete in past
+            </button>
+
+            <div className="my-1 border-t border-zinc-100 dark:border-zinc-700" />
+
+            <button
+              tabIndex={-1}
+              onClick={() => {
+                setShowNodeMenu(false)
+                if (hasLinkedRelationship) {
+                  setShowDeleteConfirm(true)
+                } else {
+                  deleteNode(nodeId)
+                }
+              }}
+              className="flex items-center gap-2 px-3 py-1.5 text-xs text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 w-full text-left"
+            >
+              <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              Delete
+            </button>
+          </div>,
+          document.body
+        )}
         </div>{/* end interactive content wrapper */}
 
       </div>
