@@ -9,7 +9,7 @@ export function saveToCache(state) {
             nestTargetId, nestZoneActive,
             _undoStack, _redoStack, _pendingSnapshot,
             ...persist } = state
-    localStorage.setItem(KEY, JSON.stringify(persist))
+    localStorage.setItem(KEY, JSON.stringify({ ...persist, savedAt: Date.now() }))
   } catch (e) {
     console.warn('Failed to save to localStorage', e)
   }

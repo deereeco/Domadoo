@@ -40,7 +40,7 @@ export async function loadFromDrive() {
 export async function saveToDrive(stateData) {
   try {
     const { user, syncStatus, detailsModalNodeId, showDoneToday, showLabelManager, historyViewDate, ...persist } = stateData
-    const body = JSON.stringify(persist)
+    const body = JSON.stringify({ ...persist, savedAt: Date.now() })
 
     const existing = await findFile()
 

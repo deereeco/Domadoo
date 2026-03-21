@@ -4,6 +4,7 @@ import { useSyncDrive } from './hooks/useSyncDrive.js'
 import { useDebugConsole } from './hooks/useDebugConsole.js'
 import { initGoogleAuth, silentRequestToken, getUserInfo } from './services/googleAuth.js'
 import { loadFromDrive } from './services/googleDrive.js'
+import { loadFromCache } from './services/localCache.js'
 import SignIn from './components/Auth/SignIn.jsx'
 import Header from './components/Layout/Header.jsx'
 import FilterBar from './components/Labels/FilterBar.jsx'
@@ -84,8 +85,11 @@ if (!state.lastCleanupDate) {
       onSignIn: async (token) => {
         const info = await getUserInfo(token)
         const userInfo = { name: info.name, email: info.email, picture: info.picture }
+        const local = loadFromCache()
         const driveData = await loadFromDrive()
-        if (driveData) hydrate(driveData)
+        if (driveData && (!local?.savedAt || driveData.savedAt > local.savedAt)) {
+          hydrate(driveData)
+        }
         setUser(userInfo)
         runCleanupCheck()
       },
