@@ -1,10 +1,11 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useStore } from './store/useStore.js'
 import { useSyncDrive } from './hooks/useSyncDrive.js'
 import { useDebugConsole } from './hooks/useDebugConsole.js'
 import { initGoogleAuth, silentRequestToken, getUserInfo } from './services/googleAuth.js'
 import { loadFromDrive } from './services/googleDrive.js'
 import { loadFromCache } from './services/localCache.js'
+import { mergeStates } from './utils/mergeStates.js'
 import SignIn from './components/Auth/SignIn.jsx'
 import Header from './components/Layout/Header.jsx'
 import FilterBar from './components/Labels/FilterBar.jsx'
@@ -31,6 +32,7 @@ export default function App() {
     dragMode, toggleDragMode,
   } = useStore()
   useDebugConsole()
+  const lastDriveRefreshRef = useRef(0)
 
   // Apply saved theme on mount
   useEffect(() => {
@@ -57,7 +59,7 @@ export default function App() {
   const runCleanupCheck = () => {
     const state = useStore.getState()
     const today = sessionToday
-if (!state.lastCleanupDate) {
+    if (!state.lastCleanupDate) {
       state.initCleanupDate(today)
       return
     }
@@ -66,14 +68,41 @@ if (!state.lastCleanupDate) {
     }
   }
 
+  // Re-fetch Drive and merge when the tab regains focus (throttled to once per 60s)
+  const refreshFromDrive = async () => {
+    const state = useStore.getState()
+    if (!state.user) return
+    const now = Date.now()
+    if (now - lastDriveRefreshRef.current < 60_000) return
+    lastDriveRefreshRef.current = now
+
+    const driveData = await loadFromDrive()
+    if (!driveData) return
+    if (driveData.savedAt <= state.lastDriveSyncAt) return // Drive hasn't changed
+
+    const local = loadFromCache()
+    const merged = mergeStates(local || {}, driveData)
+    useStore.getState().hydrate(merged)
+    useStore.getState().setLastDriveSyncAt(driveData.savedAt)
+    runCleanupCheck()
+  }
+
   // Run on mount, tab focus, and BFCache restore (pageshow covers mobile back-navigation)
   useEffect(() => {
     runCleanupCheck()
-    document.addEventListener('visibilitychange', runCleanupCheck)
-    window.addEventListener('pageshow', runCleanupCheck)
+    const handleVisibility = () => {
+      runCleanupCheck()
+      if (document.visibilityState === 'visible') refreshFromDrive()
+    }
+    const handlePageshow = (e) => {
+      runCleanupCheck()
+      if (e.persisted) refreshFromDrive() // BFCache restore
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    window.addEventListener('pageshow', handlePageshow)
     return () => {
-      document.removeEventListener('visibilitychange', runCleanupCheck)
-      window.removeEventListener('pageshow', runCleanupCheck)
+      document.removeEventListener('visibilitychange', handleVisibility)
+      window.removeEventListener('pageshow', handlePageshow)
     }
   }, [])
 
@@ -87,8 +116,13 @@ if (!state.lastCleanupDate) {
         const userInfo = { name: info.name, email: info.email, picture: info.picture }
         const local = loadFromCache()
         const driveData = await loadFromDrive()
-        if (driveData && (!local?.savedAt || driveData.savedAt > local.savedAt)) {
-          hydrate(driveData)
+        if (driveData) {
+          const merged = mergeStates(local || {}, driveData)
+          hydrate(merged)
+          useStore.getState().setLastDriveSyncAt(driveData.savedAt)
+          lastDriveRefreshRef.current = Date.now()
+        } else if (local) {
+          hydrate(local)
         }
         setUser(userInfo)
         runCleanupCheck()

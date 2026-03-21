@@ -39,8 +39,10 @@ export async function loadFromDrive() {
 
 export async function saveToDrive(stateData) {
   try {
-    const { user, syncStatus, detailsModalNodeId, showDoneToday, showLabelManager, historyViewDate, ...persist } = stateData
-    const body = JSON.stringify({ ...persist, savedAt: Date.now() })
+    // eslint-disable-next-line no-unused-vars
+    const { user, syncStatus, detailsModalNodeId, showDoneToday, showLabelManager, historyViewDate, lastDriveSyncAt, ...persist } = stateData
+    const savedAt = Date.now()
+    const body = JSON.stringify({ ...persist, savedAt })
 
     const existing = await findFile()
 
@@ -73,6 +75,7 @@ export async function saveToDrive(stateData) {
         }
       )
     }
+    return savedAt
   } catch (e) {
     console.error('Drive save error:', e)
     throw e

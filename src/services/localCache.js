@@ -8,6 +8,7 @@ export function saveToCache(state) {
             pendingCleanupTasks, showHistory, historyViewDate,
             nestTargetId, nestZoneActive,
             _undoStack, _redoStack, _pendingSnapshot,
+            lastDriveSyncAt,
             ...persist } = state
     localStorage.setItem(KEY, JSON.stringify({ ...persist, savedAt: Date.now() }))
   } catch (e) {

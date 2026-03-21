@@ -41,6 +41,9 @@ const DEFAULT_STATE = {
   // Card UI state (ephemeral)
   collapsedCards: {},    // { [nodeId]: true }
   pinnedCards: {},       // { [nodeId]: true }
+  // Multi-device merge
+  deletedNodes: {},      // { [nodeId]: { deletedAt: number } }  (persisted)
+  lastDriveSyncAt: 0,    // number (ephemeral) — savedAt of last Drive state we know about
   // Undo / redo (ephemeral, session only)
   _undoStack: [],        // [{nodes, rootOrder}] — max 50
   _redoStack: [],        // [{nodes, rootOrder}]
@@ -54,8 +57,10 @@ export const useStore = create((set, get) => ({
   hydrate(data) {
     // Ensure system labels always exist (backward compat with old saves)
     const labels = { ...data.labels, [SYSTEM_TODAY_LABEL_ID]: SYSTEM_TODAY_LABEL, [SYSTEM_TOMORROW_LABEL_ID]: SYSTEM_TOMORROW_LABEL }
-    set({ ...DEFAULT_STATE, ...data, labels, todaysTasksLabelId: SYSTEM_TODAY_LABEL_ID, tomorrowsTasksLabelId: SYSTEM_TOMORROW_LABEL_ID })
+    set({ ...DEFAULT_STATE, ...data, labels, todaysTasksLabelId: SYSTEM_TODAY_LABEL_ID, tomorrowsTasksLabelId: SYSTEM_TOMORROW_LABEL_ID, lastDriveSyncAt: data.savedAt || 0 })
   },
+
+  setLastDriveSyncAt(ts) { set({ lastDriveSyncAt: ts }) },
 
   // ── Undo / Redo ────────────────────────────────────────────────────────────
   _pushSnapshot() {
@@ -267,27 +272,29 @@ export const useStore = create((set, get) => ({
   },
 
   updateNodeContent(id, content) {
+    const ts = Date.now()
     set(state => {
       const node = state.nodes[id]
       if (!node) return {}
-      const updates = { [id]: { ...node, content } }
+      const updates = { [id]: { ...node, content, updatedAt: ts } }
       node.linkedNodeIds.forEach(lid => {
         const linked = state.nodes[lid]
-        if (linked) updates[lid] = { ...linked, content }
+        if (linked) updates[lid] = { ...linked, content, updatedAt: ts }
       })
       return { nodes: { ...state.nodes, ...updates } }
     })
   },
 
   toggleNodeType(id) {
+    const ts = Date.now()
     set(state => {
       const node = state.nodes[id]
       if (!node) return {}
       const type = node.type === 'CHECKBOX' ? 'BULLET' : 'CHECKBOX'
-      const updates = { [id]: { ...node, type } }
+      const updates = { [id]: { ...node, type, updatedAt: ts } }
       node.linkedNodeIds.forEach(lid => {
         const linked = state.nodes[lid]
-        if (linked) updates[lid] = { ...linked, type }
+        if (linked) updates[lid] = { ...linked, type, updatedAt: ts }
       })
       return { nodes: { ...state.nodes, ...updates } }
     })
@@ -295,6 +302,7 @@ export const useStore = create((set, get) => ({
 
   toggleComplete(id) {
     get()._pushSnapshot()
+    const ts = Date.now()
     set(state => {
       const node = state.nodes[id]
       if (!node) return {}
@@ -308,6 +316,7 @@ export const useStore = create((set, get) => ({
           ...n,
           status: isCompleting ? 'COMPLETED' : 'OPEN',
           completedAt: isCompleting ? new Date().toISOString() : null,
+          updatedAt: ts,
         }
         // propagate to linked nodes
         n.linkedNodeIds.forEach(linkedId => {
@@ -317,6 +326,7 @@ export const useStore = create((set, get) => ({
               ...linked,
               status: isCompleting ? 'COMPLETED' : 'OPEN',
               completedAt: isCompleting ? new Date().toISOString() : null,
+              updatedAt: ts,
             }
           }
         })
@@ -361,7 +371,12 @@ export const useStore = create((set, get) => ({
       collectDescendants(id)
 
       const newNodes = { ...state.nodes }
-      toDelete.forEach(nid => delete newNodes[nid])
+      const deletedAt = Date.now()
+      const newDeletedNodes = { ...state.deletedNodes }
+      toDelete.forEach(nid => {
+        delete newNodes[nid]
+        newDeletedNodes[nid] = { deletedAt }
+      })
 
       // Clean up linkedNodeIds and today label on surviving nodes that referenced deleted nodes
       Object.keys(newNodes).forEach(nid => {
@@ -409,7 +424,7 @@ export const useStore = create((set, get) => ({
           ? null
           : state.todaysTasksRootId
 
-      return { nodes: newNodes, rootOrder: newRootOrder, todaysTasksRootId: newTodaysTasksRootId }
+      return { nodes: newNodes, rootOrder: newRootOrder, todaysTasksRootId: newTodaysTasksRootId, deletedNodes: newDeletedNodes }
     })
   },
 
@@ -786,8 +801,13 @@ export const useStore = create((set, get) => ({
         })
       })
 
-      // Delete all collected _today nodes
-      toDelete.forEach(tid => delete newNodes[tid])
+      // Delete all collected _today nodes + tombstone them
+      const deletedAt = Date.now()
+      const newDeletedNodes = { ...state.deletedNodes }
+      toDelete.forEach(tid => {
+        delete newNodes[tid]
+        newDeletedNodes[tid] = { deletedAt }
+      })
 
       // Auto-cleanup: cascade-remove empty auto-group ancestors
       let checkParentId = parentId
@@ -810,10 +830,11 @@ export const useStore = create((set, get) => ({
           }
         })
         delete newNodes[checkParentId]
+        newDeletedNodes[checkParentId] = { deletedAt }
         checkParentId = grandParentId
       }
 
-      return { nodes: newNodes }
+      return { nodes: newNodes, deletedNodes: newDeletedNodes }
     })
   },
 
@@ -1117,8 +1138,13 @@ export const useStore = create((set, get) => ({
         })
       })
 
-      // Delete all collected _tomorrow nodes
-      toDelete.forEach(tid => delete newNodes[tid])
+      // Delete all collected _tomorrow nodes + tombstone them
+      const deletedAt = Date.now()
+      const newDeletedNodes = { ...state.deletedNodes }
+      toDelete.forEach(tid => {
+        delete newNodes[tid]
+        newDeletedNodes[tid] = { deletedAt }
+      })
 
       // Auto-cleanup: cascade-remove empty auto-group ancestors
       let checkParentId = parentId
@@ -1141,10 +1167,11 @@ export const useStore = create((set, get) => ({
           }
         })
         delete newNodes[checkParentId]
+        newDeletedNodes[checkParentId] = { deletedAt }
         checkParentId = grandParentId
       }
 
-      return { nodes: newNodes }
+      return { nodes: newNodes, deletedNodes: newDeletedNodes }
     })
   },
 
@@ -1240,7 +1267,7 @@ export const useStore = create((set, get) => ({
       const labelIds = has
         ? node.labelIds.filter(l => l !== labelId)
         : [...node.labelIds, labelId]
-      return { nodes: { ...state.nodes, [nodeId]: { ...node, labelIds } } }
+      return { nodes: { ...state.nodes, [nodeId]: { ...node, labelIds, updatedAt: Date.now() } } }
     })
   },
 
@@ -1411,9 +1438,14 @@ export const useStore = create((set, get) => ({
 
       const newRootOrder = node.parentId ? rootOrder : rootOrder.filter(id => id !== nodeId)
 
-      toDelete.forEach(nid => delete newNodes[nid])
+      const deletedAt = Date.now()
+      const newDeletedNodes = { ...state.deletedNodes }
+      toDelete.forEach(nid => {
+        delete newNodes[nid]
+        newDeletedNodes[nid] = { deletedAt }
+      })
 
-      return { nodes: newNodes, history: newHistory, rootOrder: newRootOrder }
+      return { nodes: newNodes, history: newHistory, rootOrder: newRootOrder, deletedNodes: newDeletedNodes }
     })
   },
 
@@ -1450,6 +1482,7 @@ export const useStore = create((set, get) => ({
       let newNodes = { ...nodes }
       let newHistory = [...history]
       let newRootOrder = [...state.rootOrder]
+      const newDeletedNodes = { ...state.deletedNodes }
 
       // ── Rollover Tomorrow's Tasks → Today's Tasks (silent) ──────────────────
       if (state.tomorrowsTasksRootId) {
@@ -1539,8 +1572,12 @@ export const useStore = create((set, get) => ({
             // Merge updates into newNodes
             Object.assign(newNodes, nodeUpdates, newTodayNodes)
 
-            // Delete old _tomorrow copies
-            toDelete.forEach(tid => delete newNodes[tid])
+            // Delete old _tomorrow copies + tombstone them
+            const deletedAt = Date.now()
+            toDelete.forEach(tid => {
+              delete newNodes[tid]
+              newDeletedNodes[tid] = { deletedAt }
+            })
 
             todayChildrenToAdd.push(originalId + '_today')
           })
@@ -1574,6 +1611,7 @@ export const useStore = create((set, get) => ({
           rootOrder: newRootOrder,
           lastCleanupDate: new Date().toISOString().split('T')[0],
           tomorrowsTasksRootId: state.tomorrowsTasksRootId,
+          deletedNodes: newDeletedNodes,
         }
       }
 
@@ -1584,6 +1622,7 @@ export const useStore = create((set, get) => ({
           rootOrder: newRootOrder,
           lastCleanupDate: new Date().toISOString().split('T')[0],
           todaysTasksRootId: activeTodaysId,
+          deletedNodes: newDeletedNodes,
         }
       }
 
@@ -1645,6 +1684,7 @@ export const useStore = create((set, get) => ({
         lastCleanupDate: newLastCleanupDate,
         pendingCleanupTasks,
         todaysTasksRootId: activeTodaysId,
+        deletedNodes: newDeletedNodes,
       }
     })
   },
@@ -1669,6 +1709,8 @@ export const useStore = create((set, get) => ({
       let newNodes = { ...nodes }
       let newHistory = [...history]
       const today = new Date().toISOString().split('T')[0]
+      const newDeletedNodes = { ...state.deletedNodes }
+      const cleanupDeletedAt = Date.now()
       const yesterdayDate = lastCleanupDate
 
       const toArchive = []
@@ -1735,6 +1777,7 @@ export const useStore = create((set, get) => ({
               newNodes[oid] = { ...orig, linkedNodeIds: filteredLinks, labelIds }
             })
             delete newNodes[tid]
+            newDeletedNodes[tid] = { deletedAt: cleanupDeletedAt }
           })
         } else if (resolved === 'pushback') {
           // Remove _today copy; if task was completed, also reset original to incomplete
@@ -1777,6 +1820,7 @@ export const useStore = create((set, get) => ({
               newNodes[oid] = { ...orig, linkedNodeIds: filteredLinks, labelIds }
             })
             delete newNodes[tid]
+            newDeletedNodes[tid] = { deletedAt: cleanupDeletedAt }
           })
         }
         // 'today': leave as-is, stays in Today's Tasks (incomplete tasks only)
@@ -1818,6 +1862,7 @@ export const useStore = create((set, get) => ({
         history: newHistory,
         lastCleanupDate: today,
         pendingCleanupTasks: null,
+        deletedNodes: newDeletedNodes,
         isPeeking: false,
         peekCardIds: null,
       }

@@ -14,6 +14,7 @@ export function createNode({ parentId = null, type = 'CHECKBOX', content = '' } 
     isTodaysTask: false,
     createdAt: new Date().toISOString(),
     completedAt: null,
+    updatedAt: Date.now(),
   }
 }
 
