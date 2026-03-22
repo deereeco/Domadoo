@@ -91,15 +91,23 @@ export default function DayCleanupModal() {
                       data-testid={`cleanup-action-today-${task.id}`}
                       className={buttonClass(task.resolved === 'today')}
                     >
-                      Keep for today
+                      Keep on 'Today's Tasks'
                     </button>
                     <button
-                      onClick={() => resolveCleanupTask(task.id, 'complete')}
-                      title="Mark as done and archive to yesterday"
-                      data-testid={`cleanup-action-complete-${task.id}`}
-                      className={buttonClass(task.resolved === 'complete')}
+                      onClick={() => resolveCleanupTask(task.id, 'complete_repeat')}
+                      title="Mark as done, archive to yesterday, and add back as incomplete today"
+                      data-testid={`cleanup-action-complete-repeat-${task.id}`}
+                      className={buttonClass(task.resolved === 'complete_repeat')}
                     >
-                      Done (archive)
+                      Mark as completed, archive &amp; repeat
+                    </button>
+                    <button
+                      onClick={() => resolveCleanupTask(task.id, 'complete_remove')}
+                      title="Mark as done, archive to yesterday, and remove from today and source card"
+                      data-testid={`cleanup-action-complete-remove-${task.id}`}
+                      className={buttonClass(task.resolved === 'complete_remove')}
+                    >
+                      Mark as completed, archive &amp; remove
                     </button>
                     <button
                       onClick={() => resolveCleanupTask(task.id, 'pushback')}
@@ -134,20 +142,20 @@ export default function DayCleanupModal() {
                   </div>
                   <div className="flex gap-2 ml-5">
                     <button
-                      onClick={() => resolveCleanupTask(task.id, 'repeat')}
-                      title="Reset to incomplete and keep in today's list"
-                      data-testid={`cleanup-action-repeat-${task.id}`}
-                      className={buttonClass(task.resolved === 'repeat')}
+                      onClick={() => resolveCleanupTask(task.id, 'archive_repeat')}
+                      title="Archive as done yesterday and add back as incomplete today"
+                      data-testid={`cleanup-action-archive-repeat-${task.id}`}
+                      className={buttonClass(task.resolved === 'archive_repeat')}
                     >
-                      Repeat
+                      Archive &amp; repeat
                     </button>
                     <button
-                      onClick={() => resolveCleanupTask(task.id, 'remove')}
-                      title="Archive as completed and remove from today"
-                      data-testid={`cleanup-action-remove-${task.id}`}
-                      className={buttonClass(task.resolved === 'remove')}
+                      onClick={() => resolveCleanupTask(task.id, 'archive_remove')}
+                      title="Archive as completed and remove from today and source card"
+                      data-testid={`cleanup-action-archive-remove-${task.id}`}
+                      className={buttonClass(task.resolved === 'archive_remove')}
                     >
-                      Done (archive)
+                      Archive &amp; remove
                     </button>
                     <button
                       onClick={() => resolveCleanupTask(task.id, 'pushback')}
@@ -173,7 +181,19 @@ export default function DayCleanupModal() {
                   onClick={() => handleApplyAll('today', false)}
                   className="px-3 py-1.5 text-xs rounded-lg font-medium border border-zinc-300 dark:border-zinc-600 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
                 >
-                  All: Keep for today
+                  All: Keep on 'Today's Tasks'
+                </button>
+                <button
+                  onClick={() => handleApplyAll('complete_repeat', false)}
+                  className="px-3 py-1.5 text-xs rounded-lg font-medium border border-zinc-300 dark:border-zinc-600 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
+                >
+                  All: Mark as completed, archive &amp; repeat
+                </button>
+                <button
+                  onClick={() => handleApplyAll('complete_remove', false)}
+                  className="px-3 py-1.5 text-xs rounded-lg font-medium border border-zinc-300 dark:border-zinc-600 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
+                >
+                  All: Mark as completed, archive &amp; remove
                 </button>
                 <button
                   onClick={() => handleApplyAll('pushback', false)}
@@ -186,16 +206,22 @@ export default function DayCleanupModal() {
             {completedTasks.length > 0 && (
               <>
                 <button
-                  onClick={() => handleApplyAll('repeat', true)}
+                  onClick={() => handleApplyAll('archive_repeat', true)}
                   className="px-3 py-1.5 text-xs rounded-lg font-medium border border-zinc-300 dark:border-zinc-600 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
                 >
-                  All: Repeat
+                  All: Archive &amp; repeat
                 </button>
                 <button
-                  onClick={() => handleApplyAll('remove', true)}
+                  onClick={() => handleApplyAll('archive_remove', true)}
                   className="px-3 py-1.5 text-xs rounded-lg font-medium border border-zinc-300 dark:border-zinc-600 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
                 >
-                  All: Done (archive)
+                  All: Archive &amp; remove
+                </button>
+                <button
+                  onClick={() => handleApplyAll('pushback', true)}
+                  className="px-3 py-1.5 text-xs rounded-lg font-medium border border-zinc-300 dark:border-zinc-600 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
+                >
+                  All: Return to original card
                 </button>
               </>
             )}

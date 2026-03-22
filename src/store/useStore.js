@@ -1725,7 +1725,7 @@ export const useStore = create((set, get) => ({
         const todayNode = newNodes[todayId]
         if (!todayNode) return
 
-        if (resolved === 'repeat') {
+        if (resolved === 'archive_repeat') {
           // Completed task: archive to history, reset both copies to incomplete, keep in Today's Tasks
           toArchive.push(todayId)
           newNodes[todayId] = { ...todayNode, status: 'INCOMPLETE', completedAt: undefined }
@@ -1734,10 +1734,27 @@ export const useStore = create((set, get) => ({
             newNodes[originalId] = { ...newNodes[originalId], status: 'INCOMPLETE', completedAt: undefined }
           }
           // Leave in Today's Tasks card — no removal needed
-        } else if (resolved === 'complete' || resolved === 'remove') {
-          // 'complete': incomplete task marked done; 'remove': completed task being removed
-          // Both archive and delete the _today copy
-          if (resolved === 'complete') {
+        } else if (resolved === 'complete_repeat') {
+          // Incomplete task: mark as completed, archive to history, then reset to incomplete (repeat in today)
+          const originalId = todayNode.linkedNodeIds[0]
+          const original = newNodes[originalId]
+          const now = new Date().toISOString()
+          if (original) {
+            newNodes[originalId] = { ...original, status: 'COMPLETED', completedAt: now }
+          }
+          // Keep completedAt on today copy so the archive snapshot can read it after the reset
+          newNodes[todayId] = { ...todayNode, status: 'INCOMPLETE', completedAt: now }
+          toArchive.push(todayId)
+          // Reset original back to incomplete
+          if (originalId && newNodes[originalId]) {
+            newNodes[originalId] = { ...newNodes[originalId], status: 'INCOMPLETE', completedAt: undefined }
+          }
+          // Leave in Today's Tasks card — no removal needed
+        } else if (resolved === 'complete_remove' || resolved === 'archive_remove') {
+          // 'complete_remove': incomplete task marked done then fully removed
+          // 'archive_remove': completed task archived and fully removed
+          // Both archive, delete the _today copy, AND delete the original from its source card
+          if (resolved === 'complete_remove') {
             // Mark completed (only needed for incomplete tasks being resolved as done)
             const originalId = todayNode.linkedNodeIds[0]
             const original = newNodes[originalId]
@@ -1758,7 +1775,7 @@ export const useStore = create((set, get) => ({
             }
           }
 
-          // Clean up _today descendants
+          // Clean up _today descendants and collect original node ids to remove
           const toDelete = new Set()
           const collect = (nid) => {
             const n = newNodes[nid]
@@ -1784,6 +1801,20 @@ export const useStore = create((set, get) => ({
             delete newNodes[tid]
             newDeletedNodes[tid] = { deletedAt: cleanupDeletedAt }
           })
+
+          // Also remove the original node from its source card
+          const originalId = todayNode.linkedNodeIds[0]
+          if (originalId && newNodes[originalId]) {
+            const sourceCardId = newNodes[originalId].parentId
+            if (sourceCardId && newNodes[sourceCardId]) {
+              newNodes[sourceCardId] = {
+                ...newNodes[sourceCardId],
+                childrenIds: newNodes[sourceCardId].childrenIds.filter(c => c !== originalId),
+              }
+            }
+            delete newNodes[originalId]
+            newDeletedNodes[originalId] = { deletedAt: cleanupDeletedAt }
+          }
         } else if (resolved === 'pushback') {
           // Remove _today copy; if task was completed, also reset original to incomplete
           if (isCompleted) {
@@ -1831,7 +1862,7 @@ export const useStore = create((set, get) => ({
         // 'today': leave as-is, stays in Today's Tasks (incomplete tasks only)
       })
 
-      // Archive resolved tasks (complete, remove, pushback for completed, repeat)
+      // Archive resolved tasks (complete_repeat, complete_remove, archive_repeat, archive_remove, pushback for completed)
       if (toArchive.length > 0) {
         const snapshotTasks = toArchive.map(id => {
           const n = newNodes[id] ?? nodes[id]
@@ -1840,7 +1871,7 @@ export const useStore = create((set, get) => ({
           const orig = newNodes[origId] ?? nodes[origId] ?? n
           // For 'repeat' tasks, newNodes[origId].completedAt was reset to undefined;
           // fall back to the pre-cleanup value from nodes[] for the history record.
-          const completedAt = orig.completedAt ?? nodes[origId]?.completedAt
+          const completedAt = orig.completedAt ?? nodes[origId]?.completedAt ?? n.completedAt
           return {
             id: origId,
             content: orig.content,
