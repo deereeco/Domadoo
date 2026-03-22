@@ -43,6 +43,7 @@ const DEFAULT_STATE = {
   pinnedCards: {},       // { [nodeId]: true }
   // Multi-device merge
   deletedNodes: {},      // { [nodeId]: { deletedAt: number } }  (persisted)
+  rootOrderUpdatedAt: 0, // number (persisted) — when rootOrder was last changed by a drag/move
   lastDriveSyncAt: 0,    // number (ephemeral) — savedAt of last Drive state we know about
   // Undo / redo (ephemeral, session only)
   _undoStack: [],        // [{nodes, rootOrder}] — max 50
@@ -436,23 +437,27 @@ export const useStore = create((set, get) => ({
       if (!node) return {}
       const newNodes = { ...state.nodes }
       const newRootOrder = [...state.rootOrder]
+      const ts = Date.now()
+      let rootOrderUpdatedAt = state.rootOrderUpdatedAt
 
       // Remove from old location
       if (node.parentId) {
-        const oldParent = { ...newNodes[node.parentId] }
+        const oldParent = { ...newNodes[node.parentId], updatedAt: ts }
         oldParent.childrenIds = oldParent.childrenIds.filter(c => c !== nodeId)
         newNodes[node.parentId] = oldParent
       } else {
         const idx = newRootOrder.indexOf(nodeId)
         if (idx !== -1) newRootOrder.splice(idx, 1)
+        rootOrderUpdatedAt = ts
       }
 
       // Insert into new location
       if (newParentId === null) {
         newRootOrder.splice(newIndex, 0, nodeId)
         newNodes[nodeId] = { ...node, parentId: null }
+        rootOrderUpdatedAt = ts
       } else {
-        const newParent = { ...newNodes[newParentId] }
+        const newParent = { ...newNodes[newParentId], updatedAt: ts }
         const children = [...newParent.childrenIds]
         children.splice(newIndex, 0, nodeId)
         newParent.childrenIds = children
@@ -460,7 +465,7 @@ export const useStore = create((set, get) => ({
         newNodes[nodeId] = { ...node, parentId: newParentId }
       }
 
-      return { nodes: newNodes, rootOrder: newRootOrder }
+      return { nodes: newNodes, rootOrder: newRootOrder, rootOrderUpdatedAt }
     })
   },
 
@@ -470,7 +475,7 @@ export const useStore = create((set, get) => ({
       const newRootOrder = [...state.rootOrder]
       const [moved] = newRootOrder.splice(oldIndex, 1)
       newRootOrder.splice(newIndex, 0, moved)
-      return { rootOrder: newRootOrder }
+      return { rootOrder: newRootOrder, rootOrderUpdatedAt: Date.now() }
     })
   },
 
@@ -483,7 +488,7 @@ export const useStore = create((set, get) => ({
       const [moved] = children.splice(oldIndex, 1)
       children.splice(newIndex, 0, moved)
       return {
-        nodes: { ...state.nodes, [parentId]: { ...parent, childrenIds: children } },
+        nodes: { ...state.nodes, [parentId]: { ...parent, childrenIds: children, updatedAt: Date.now() } },
       }
     })
   },

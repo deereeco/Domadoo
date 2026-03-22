@@ -40,8 +40,9 @@ export function mergeStates(local, drive) {
     }
   }
 
-  // 2. rootOrder: prefer the newer savedAt side's order, append any new IDs from the other
-  const [newerOrder, olderOrder] = (drive.savedAt || 0) > (local.savedAt || 0)
+  // 2. rootOrder: prefer the side that most recently changed the order (rootOrderUpdatedAt),
+  //    falling back to local winning when neither side has tracked it (safe default for old data)
+  const [newerOrder, olderOrder] = (drive.rootOrderUpdatedAt || 0) > (local.rootOrderUpdatedAt || 0)
     ? [drive.rootOrder, local.rootOrder]
     : [local.rootOrder, drive.rootOrder]
   const mergedRootOrder = [...(newerOrder || [])]
