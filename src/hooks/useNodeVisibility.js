@@ -43,11 +43,30 @@ export function useNodeVisibility() {
     const hideLabels = Object.entries(activeFilters).filter(([, v]) => v === 'hide').map(([k]) => k)
     const hasFilters = showLabels.length > 0 || hideLabels.length > 0
 
+    // Precompute nodes hidden by per-card hideCompleted setting
+    const hiddenByHideCompleted = new Set()
+    Object.values(nodes).forEach(card => {
+      if (card.parentId === null && card.uiState?.hideCompleted) {
+        const markHidden = (nodeId, ancestorCompleted) => {
+          const n = nodes[nodeId]
+          if (!n) return
+          const isCompleted = ancestorCompleted || n.status === 'COMPLETED'
+          if (isCompleted) {
+            hiddenByHideCompleted.add(nodeId)
+            n.childrenIds.forEach(cid => markHidden(cid, true))
+          } else {
+            n.childrenIds.forEach(cid => markHidden(cid, false))
+          }
+        }
+        card.childrenIds.forEach(cid => markHidden(cid, false))
+      }
+    })
+
     if (!hasFilters) {
-      // All visible, not dimmed
+      // All visible, not dimmed (except hideCompleted)
       const result = {}
       Object.keys(nodes).forEach(id => {
-        result[id] = { visible: true, dimmed: false, hasHiddenChildren: false }
+        result[id] = { visible: !hiddenByHideCompleted.has(id), dimmed: false, hasHiddenChildren: false }
       })
       return result
     }
@@ -90,6 +109,7 @@ export function useNodeVisibility() {
         }
       }
 
+      if (hiddenByHideCompleted.has(id)) visible = false
       result[id] = { visible, dimmed, hasHiddenChildren }
     })
 

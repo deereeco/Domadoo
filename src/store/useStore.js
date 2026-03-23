@@ -1489,6 +1489,178 @@ export const useStore = create((set, get) => ({
     })
   },
 
+  toggleHideCompleted(cardId) {
+    set(state => {
+      const node = state.nodes[cardId]
+      if (!node) return {}
+      return {
+        nodes: {
+          ...state.nodes,
+          [cardId]: {
+            ...node,
+            uiState: { ...node.uiState, hideCompleted: !node.uiState.hideCompleted },
+            updatedAt: Date.now(),
+          },
+        },
+      }
+    })
+  },
+
+  removeCompletedTasksFromCard(cardId) {
+    set(state => {
+      const { nodes } = state
+      const toDelete = new Set()
+
+      const collectCompleted = (nodeId, ancestorCompleted) => {
+        const n = nodes[nodeId]
+        if (!n) return
+        const isCompleted = ancestorCompleted || n.status === 'COMPLETED'
+        if (isCompleted) {
+          toDelete.add(nodeId)
+          n.childrenIds.forEach(cid => collectCompleted(cid, true))
+        } else {
+          n.childrenIds.forEach(cid => collectCompleted(cid, false))
+        }
+      }
+
+      const card = nodes[cardId]
+      if (!card) return {}
+      card.childrenIds.forEach(cid => collectCompleted(cid, false))
+
+      if (toDelete.size === 0) return {}
+
+      const newNodes = { ...nodes }
+      const newDeletedNodes = { ...state.deletedNodes }
+      const deletedAt = Date.now()
+
+      // Remove deleted IDs from all parent childrenIds
+      toDelete.forEach(nid => {
+        const n = nodes[nid]
+        if (!n) return
+        if (n.parentId && newNodes[n.parentId] && !toDelete.has(n.parentId)) {
+          newNodes[n.parentId] = {
+            ...newNodes[n.parentId],
+            childrenIds: newNodes[n.parentId].childrenIds.filter(id => id !== nid),
+          }
+        }
+        delete newNodes[nid]
+        newDeletedNodes[nid] = { deletedAt }
+      })
+
+      return { nodes: newNodes, deletedNodes: newDeletedNodes }
+    })
+  },
+
+  archiveCompletedTasksFromCard(cardId, date) {
+    set(state => {
+      const { nodes, history } = state
+      const card = nodes[cardId]
+      if (!card) return {}
+
+      // Find top-level completed subtrees (direct children of the card that are completed)
+      const completedChildren = card.childrenIds.filter(cid => {
+        const n = nodes[cid]
+        return n && n.status === 'COMPLETED'
+      })
+
+      if (completedChildren.length === 0) return {}
+
+      // Serialize each completed child
+      const tasks = completedChildren
+        .map(cid => {
+          const serialized = get()._serializeTaskTree(cid, nodes)
+          if (!serialized) return null
+          return { ...serialized, status: 'COMPLETED', completedAt: date + 'T00:00:00.000Z' }
+        })
+        .filter(Boolean)
+
+      // Add to history snapshot
+      let newHistory = [...history]
+      const existingIdx = newHistory.findIndex(s => s.date === date)
+      if (existingIdx >= 0) {
+        newHistory[existingIdx] = {
+          ...newHistory[existingIdx],
+          tasks: [...newHistory[existingIdx].tasks, ...tasks],
+        }
+      } else {
+        newHistory.push(createHistorySnapshot(date, tasks))
+      }
+
+      // Collect all node IDs to delete
+      const toDelete = new Set()
+      const collect = (nid) => {
+        if (!nodes[nid]) return
+        toDelete.add(nid)
+        nodes[nid].childrenIds.forEach(collect)
+      }
+      completedChildren.forEach(collect)
+
+      const newNodes = { ...nodes }
+      // Remove from card's childrenIds
+      newNodes[cardId] = {
+        ...newNodes[cardId],
+        childrenIds: newNodes[cardId].childrenIds.filter(id => !toDelete.has(id)),
+        updatedAt: Date.now(),
+      }
+
+      const deletedAt = Date.now()
+      const newDeletedNodes = { ...state.deletedNodes }
+      toDelete.forEach(nid => {
+        delete newNodes[nid]
+        newDeletedNodes[nid] = { deletedAt }
+      })
+
+      return { nodes: newNodes, history: newHistory, deletedNodes: newDeletedNodes }
+    })
+  },
+
+  archiveAllTasksFromCard(cardId, date) {
+    set(state => {
+      const { nodes, history, rootOrder } = state
+      const node = nodes[cardId]
+      if (!node) return {}
+
+      // Serialize the full card tree
+      const serialized = get()._serializeTaskTree(cardId, nodes)
+      if (!serialized) return {}
+
+      const task = { ...serialized, status: 'COMPLETED', completedAt: date + 'T00:00:00.000Z' }
+
+      // Archive to history
+      let newHistory = [...history]
+      const existingIdx = newHistory.findIndex(s => s.date === date)
+      if (existingIdx >= 0) {
+        newHistory[existingIdx] = {
+          ...newHistory[existingIdx],
+          tasks: [...newHistory[existingIdx].tasks, task],
+        }
+      } else {
+        newHistory.push(createHistorySnapshot(date, [task]))
+      }
+
+      // Collect all node IDs to delete
+      const toDelete = new Set()
+      const collect = (nid) => {
+        if (!nodes[nid]) return
+        toDelete.add(nid)
+        nodes[nid].childrenIds.forEach(collect)
+      }
+      collect(cardId)
+
+      const newNodes = { ...nodes }
+      const newRootOrder = rootOrder.filter(id => id !== cardId)
+
+      const deletedAt = Date.now()
+      const newDeletedNodes = { ...state.deletedNodes }
+      toDelete.forEach(nid => {
+        delete newNodes[nid]
+        newDeletedNodes[nid] = { deletedAt }
+      })
+
+      return { nodes: newNodes, history: newHistory, rootOrder: newRootOrder, deletedNodes: newDeletedNodes }
+    })
+  },
+
   markCompleteInPast(nodeId, date) {
     set(state => {
       const { nodes, history, rootOrder } = state

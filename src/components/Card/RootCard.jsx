@@ -7,6 +7,7 @@ import { useStore } from '../../store/useStore.js'
 import NodeItem from '../Node/NodeItem.jsx'
 import NodeContent from '../Node/NodeContent.jsx'
 import LabelAssigner from '../Labels/LabelAssigner.jsx'
+import DatePickerPopover from '../Node/DatePickerPopover.jsx'
 
 export default function RootCard({ nodeId, peekLocked = false }) {
   const node = useStore(s => s.nodes[nodeId])
@@ -14,7 +15,9 @@ export default function RootCard({ nodeId, peekLocked = false }) {
           toggleLabelOnNode, todaysTasksLabelId, tomorrowsTasksLabelId,
           collapsedCards, toggleCardCollapse,
           pinnedCards, toggleCardPin,
-          openDetailsModal, toggleComplete, nodes } = useStore()
+          openDetailsModal, toggleComplete, nodes,
+          toggleHideCompleted, removeCompletedTasksFromCard,
+          archiveCompletedTasksFromCard, archiveAllTasksFromCard } = useStore()
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: nodeId,
@@ -31,9 +34,12 @@ export default function RootCard({ nodeId, peekLocked = false }) {
   const cardMenuBtnRef = useRef(null)
   const cardMenuDropdownRef = useRef(null)
   const [pendingDelete, setPendingDelete] = useState(false)
+  const [pendingRemoveCompleted, setPendingRemoveCompleted] = useState(false)
   const [showCardMenu, setShowCardMenu] = useState(false)
   const [cardMenuPos, setCardMenuPos] = useState(null)
   const [showLabelAssigner, setShowLabelAssigner] = useState(false)
+  const [datePickerMode, setDatePickerMode] = useState(null) // 'completed' | 'all'
+  const datePickerRef = useRef(null)
   const isCollapsed = !!collapsedCards[nodeId]
   const isPinned = !!pinnedCards[nodeId]
 
@@ -43,6 +49,15 @@ export default function RootCard({ nodeId, peekLocked = false }) {
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
   }, [pendingDelete])
+
+  useEffect(() => {
+    if (!datePickerMode) return
+    const handler = (e) => {
+      if (!datePickerRef.current?.contains(e.target)) setDatePickerMode(null)
+    }
+    document.addEventListener('pointerdown', handler)
+    return () => document.removeEventListener('pointerdown', handler)
+  }, [datePickerMode])
 
   useEffect(() => {
     if (!showCardMenu) return
@@ -347,6 +362,65 @@ export default function RootCard({ nodeId, peekLocked = false }) {
 
               <div className="my-1 border-t border-zinc-100 dark:border-zinc-700" />
 
+              {/* Hide/show completed tasks toggle */}
+              <button
+                tabIndex={-1}
+                onClick={() => { toggleHideCompleted(nodeId); setShowCardMenu(false) }}
+                className="flex items-center gap-2 px-3 py-1.5 text-xs text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 w-full text-left"
+              >
+                <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  {node.uiState?.hideCompleted
+                    ? <><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></>
+                    : <><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></>
+                  }
+                </svg>
+                {node.uiState?.hideCompleted ? 'Show completed tasks' : 'Hide completed tasks'}
+              </button>
+
+              {/* Remove completed tasks */}
+              <button
+                tabIndex={-1}
+                onClick={() => { setShowCardMenu(false); setPendingRemoveCompleted(true) }}
+                className="flex items-center gap-2 px-3 py-1.5 text-xs text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 w-full text-left"
+              >
+                <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                </svg>
+                Remove completed tasks
+              </button>
+
+              <div className="my-1 border-t border-zinc-100 dark:border-zinc-700" />
+
+              {/* Mark done (completed tasks) — date picker → archive completed subtasks only */}
+              <button
+                tabIndex={-1}
+                onClick={() => { setShowCardMenu(false); setDatePickerMode('completed') }}
+                className="flex items-center gap-2 px-3 py-1.5 text-xs text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 w-full text-left"
+              >
+                <svg className="w-3.5 h-3.5 flex-shrink-0 text-indigo-500" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <rect x="3" y="4" width="18" height="18" rx="2" strokeWidth={2} />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 2v4M8 2v4M3 10h18" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 16l2 2 4-4" />
+                </svg>
+                Mark done (completed tasks)
+              </button>
+
+              {/* Mark done (archive all) — date picker → archive all tasks + remove card */}
+              <button
+                tabIndex={-1}
+                onClick={() => { setShowCardMenu(false); setDatePickerMode('all') }}
+                className="flex items-center gap-2 px-3 py-1.5 text-xs text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 w-full text-left"
+              >
+                <svg className="w-3.5 h-3.5 flex-shrink-0 text-indigo-500" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <rect x="3" y="4" width="18" height="18" rx="2" strokeWidth={2} />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 2v4M8 2v4M3 10h18" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 16l2 2 4-4" />
+                </svg>
+                Mark done (archive all)
+              </button>
+
+              <div className="my-1 border-t border-zinc-100 dark:border-zinc-700" />
+
               <button
                 tabIndex={-1}
                 onClick={() => { setShowCardMenu(false); setPendingDelete(true) }}
@@ -357,6 +431,24 @@ export default function RootCard({ nodeId, peekLocked = false }) {
                 </svg>
                 Delete card
               </button>
+            </div>,
+            document.body
+          )}
+
+          {/* Date picker portal for "Mark done" actions */}
+          {datePickerMode && cardMenuPos && createPortal(
+            <div
+              ref={datePickerRef}
+              style={{ position: 'fixed', top: cardMenuPos.top, right: cardMenuPos.right, zIndex: 9999, width: 0, height: 0, overflow: 'visible' }}
+            >
+              <DatePickerPopover
+                onSelectDate={(date) => {
+                  if (datePickerMode === 'completed') archiveCompletedTasksFromCard(nodeId, date)
+                  else archiveAllTasksFromCard(nodeId, date)
+                  setDatePickerMode(null)
+                }}
+                onClose={() => setDatePickerMode(null)}
+              />
             </div>,
             document.body
           )}
@@ -401,6 +493,40 @@ export default function RootCard({ nodeId, peekLocked = false }) {
             </button>
           </div>
         </>
+      )}
+
+      {pendingRemoveCompleted && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+          onClick={() => setPendingRemoveCompleted(false)}
+        >
+          <div
+            className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-sm border border-zinc-200 dark:border-zinc-700 p-6 flex flex-col gap-4"
+            onClick={e => e.stopPropagation()}
+          >
+            <div>
+              <h2 className="font-semibold text-zinc-900 dark:text-white">Remove completed tasks?</h2>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
+                All completed tasks in &ldquo;{node.content}&rdquo; will be permanently deleted. This cannot be undone.
+              </p>
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setPendingRemoveCompleted(false)}
+                className="px-4 py-2 text-sm rounded-xl font-medium border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                autoFocus
+                onClick={() => { removeCompletedTasksFromCard(nodeId); setPendingRemoveCompleted(false) }}
+                className="px-4 py-2 text-sm rounded-xl font-medium bg-red-500 text-white hover:bg-red-600 transition-colors"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {pendingDelete && (
