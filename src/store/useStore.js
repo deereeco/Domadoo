@@ -212,10 +212,10 @@ export const useStore = create((set, get) => ({
       // Sync new child to linked today copies
       let todayParentId = null
       if (parent.isTodaysTask) {
-        // Adding directly into a today copy — sync back to original parent too
-        todayParentId = parentId
         const originalParentId = parent.linkedNodeIds[0]
         if (originalParentId) {
+          // Adding directly into a today copy that has a linked original — sync back to original too
+          todayParentId = parentId
           const origParent = state.nodes[originalParentId]
           if (origParent) {
             const origChildrenIds = [...origParent.childrenIds]
@@ -224,6 +224,8 @@ export const useStore = create((set, get) => ({
             updates[node.id] = { ...node, parentId: originalParentId }
           }
         }
+        // If no linked original (today root card), leave updates[parentId] as-is so node.id is
+        // added directly as a standalone child of today root — no _today copy needed
       } else {
         // Adding to an original — find its today-copy parent
         const linkedTodayParent = parent.linkedNodeIds.find(lid => state.nodes[lid]?.isTodaysTask)
@@ -465,6 +467,33 @@ export const useStore = create((set, get) => ({
         newNodes[nodeId] = { ...node, parentId: newParentId }
       }
 
+      // Propagate structural move to linked copies (today/tomorrow)
+      if (newParentId !== null && node.linkedNodeIds.length > 0) {
+        node.linkedNodeIds.forEach(linkedId => {
+          const linked = state.nodes[linkedId]
+          if (!linked) return
+          // Find the linked equivalent of newParentId (same today/tomorrow flags)
+          const linkedNewParentId = state.nodes[newParentId]?.linkedNodeIds.find(lid => {
+            const ln = state.nodes[lid]
+            return ln && ln.isTodaysTask === linked.isTodaysTask && ln.isTomorrowsTask === linked.isTomorrowsTask
+          })
+          if (!linkedNewParentId || !newNodes[linkedNewParentId]) return
+          // Remove linked from its old parent
+          if (linked.parentId && newNodes[linked.parentId]) {
+            const oldLinkedParent = { ...newNodes[linked.parentId], updatedAt: ts }
+            oldLinkedParent.childrenIds = oldLinkedParent.childrenIds.filter(c => c !== linkedId)
+            newNodes[linked.parentId] = oldLinkedParent
+          }
+          // Insert linked into new linked parent
+          const newLinkedParent = { ...newNodes[linkedNewParentId], updatedAt: ts }
+          const linkedChildren = [...newLinkedParent.childrenIds]
+          linkedChildren.splice(newIndex, 0, linkedId)
+          newLinkedParent.childrenIds = linkedChildren
+          newNodes[linkedNewParentId] = newLinkedParent
+          newNodes[linkedId] = { ...linked, parentId: linkedNewParentId }
+        })
+      }
+
       return { nodes: newNodes, rootOrder: newRootOrder, rootOrderUpdatedAt }
     })
   },
@@ -487,9 +516,32 @@ export const useStore = create((set, get) => ({
       const children = [...parent.childrenIds]
       const [moved] = children.splice(oldIndex, 1)
       children.splice(newIndex, 0, moved)
-      return {
-        nodes: { ...state.nodes, [parentId]: { ...parent, childrenIds: children, updatedAt: Date.now() } },
+      const ts = Date.now()
+      const newNodes = {
+        ...state.nodes,
+        [parentId]: { ...parent, childrenIds: children, updatedAt: ts },
       }
+
+      // Propagate reorder to linked copies of this parent (today/tomorrow)
+      parent.linkedNodeIds.forEach(linkedParentId => {
+        const linkedParent = state.nodes[linkedParentId]
+        if (!linkedParent) return
+        const movedNode = state.nodes[moved]
+        if (!movedNode) return
+        const movedLinkedId = movedNode.linkedNodeIds.find(lid => {
+          const ln = state.nodes[lid]
+          return ln && ln.isTodaysTask === linkedParent.isTodaysTask && ln.isTomorrowsTask === linkedParent.isTomorrowsTask
+        })
+        if (!movedLinkedId) return
+        const linkedChildren = [...linkedParent.childrenIds]
+        const linkedOldIdx = linkedChildren.indexOf(movedLinkedId)
+        if (linkedOldIdx === -1) return
+        linkedChildren.splice(linkedOldIdx, 1)
+        linkedChildren.splice(Math.min(newIndex, linkedChildren.length), 0, movedLinkedId)
+        newNodes[linkedParentId] = { ...linkedParent, childrenIds: linkedChildren, updatedAt: ts }
+      })
+
+      return { nodes: newNodes }
     })
   },
 

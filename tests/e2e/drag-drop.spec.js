@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { setupMockState, IDS } from './helpers/mockState.js'
+import { setupMockState, setupLinkedDragState, IDS } from './helpers/mockState.js'
 
 // Selectors
 const nodeHandle = (id) => `[data-testid="node-handle-${id}"]`
@@ -194,5 +194,63 @@ test.describe('Drag and drop', () => {
     // And the board should have gained a new card (A1 becomes a root card)
     const totalCards = await page.locator(cardSelector).count()
     expect(totalCards).toBe(3) // CARD_A + CARD_B + extracted A1 as new card
+  })
+})
+
+// ── Today's Tasks structural sync (issue #52) ─────────────────────────────────
+
+test.describe('Today/source structural sync', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupLinkedDragState(page)
+    await page.goto('/Domadoo/')
+    await page.waitForSelector('[data-testid="board"]')
+    await enableDragMode(page)
+  })
+
+  test('reorder in Today copy syncs to source: drag A2_today above A1_today → A2 above A1 in source', async ({ page }) => {
+    // Sanity: A1_today renders above A2_today before drag
+    const a1tBefore = await page.locator(`[data-testid="node-${IDS.LINKED_TASK_A1_T}"]`).boundingBox()
+    const a2tBefore = await page.locator(`[data-testid="node-${IDS.LINKED_TASK_A2_T}"]`).boundingBox()
+    expect(a1tBefore.y).toBeLessThan(a2tBefore.y)
+
+    // Drag A2_today above A1_today (drop on top half of A1_today)
+    await dragTo(
+      page,
+      nodeHandle(IDS.LINKED_TASK_A2_T),
+      nodeHandle(IDS.LINKED_TASK_A1_T),
+      { steps: 15, offsetY: -Math.floor(a1tBefore.height * 0.4) }
+    )
+
+    // Today copy: A2_today should now be above A1_today
+    const a1tAfter = await page.locator(`[data-testid="node-${IDS.LINKED_TASK_A2_T}"]`).boundingBox()
+    const a2tAfter = await page.locator(`[data-testid="node-${IDS.LINKED_TASK_A1_T}"]`).boundingBox()
+    expect(a1tAfter.y).toBeLessThan(a2tAfter.y)
+
+    // Source (Card A): A2 should now be above A1
+    const a1After = await page.locator(`[data-testid="node-${IDS.LINKED_TASK_A1}"]`).boundingBox()
+    const a2After = await page.locator(`[data-testid="node-${IDS.LINKED_TASK_A2}"]`).boundingBox()
+    expect(a2After.y).toBeLessThan(a1After.y)
+  })
+
+  test('nest in source syncs to Today copy: nesting A1 under A2 → A1_today nested under A2_today', async ({ page }) => {
+    // Nest A1 under A2 in Card A (source) by holding over A2's center
+    await dragHoldNest(
+      page,
+      nodeHandle(IDS.LINKED_TASK_A1),
+      `[data-testid="node-${IDS.LINKED_TASK_A2}"]`,
+      600
+    )
+
+    // Source: A1 should be indented (child of A2)
+    const a1After = await page.locator(`[data-testid="node-${IDS.LINKED_TASK_A1}"]`).boundingBox()
+    const a2After = await page.locator(`[data-testid="node-${IDS.LINKED_TASK_A2}"]`).boundingBox()
+    expect(a2After.y).toBeLessThan(a1After.y)
+    expect(a1After.x).toBeGreaterThan(a2After.x)
+
+    // Today copy: A1_today should also be indented (child of A2_today)
+    const a1tAfter = await page.locator(`[data-testid="node-${IDS.LINKED_TASK_A1_T}"]`).boundingBox()
+    const a2tAfter = await page.locator(`[data-testid="node-${IDS.LINKED_TASK_A2_T}"]`).boundingBox()
+    expect(a2tAfter.y).toBeLessThan(a1tAfter.y)
+    expect(a1tAfter.x).toBeGreaterThan(a2tAfter.x)
   })
 })

@@ -43,6 +43,14 @@ export const IDS = {
   TODAY_CARD_BC:  'test-today-bc00-0000-0000-000000000013',
   TODAY_TABLE:    'test-node-tbl0-0000-0000-000000000012_today',
   TODAY_CLEANING: 'test-node-cln0-0000-0000-000000000011_today',
+  // Linked drag/sync test IDs (issue #52)
+  LINKED_TODAY_CARD:  'test-lnk-today-0000-0000-000000000029',
+  LINKED_CARD_A:      'test-lnk-carda-0000-0000-000000000030',
+  LINKED_TASK_A1:     'test-lnk-ta1--0000-0000-000000000031',
+  LINKED_TASK_A2:     'test-lnk-ta2--0000-0000-000000000032',
+  LINKED_GROUP:       'test-lnk-grp--0000-0000-000000000033',
+  LINKED_TASK_A1_T:   'test-lnk-ta1--0000-0000-000000000031_today',
+  LINKED_TASK_A2_T:   'test-lnk-ta2--0000-0000-000000000032_today',
 }
 
 function node(id, parentId, childrenIds, content) {
@@ -497,4 +505,75 @@ export async function setupFilterState(page) {
   await page.route('https://apis.google.com/**', route => route.abort())
   await page.route('https://accounts.google.com/**', route => route.abort())
   await injectState(page, buildFilterState())
+}
+
+/**
+ * State for linked-task drag/sync tests (issue #52):
+ *   Card A
+ *     └─ Task A1 (linked → A1_today)
+ *     └─ Task A2 (linked → A2_today)
+ *
+ *   Today's Tasks
+ *     └─ [Card A group] (auto-group, linked → Card A)
+ *          └─ Task A1_today (linked → A1)
+ *          └─ Task A2_today (linked → A2)
+ */
+export function buildLinkedDragState() {
+  return {
+    nodes: {
+      [IDS.LINKED_CARD_A]: {
+        ...node(IDS.LINKED_CARD_A, null, [IDS.LINKED_TASK_A1, IDS.LINKED_TASK_A2], 'Card A'),
+        linkedNodeIds: [IDS.LINKED_GROUP],
+      },
+      [IDS.LINKED_TASK_A1]: {
+        ...node(IDS.LINKED_TASK_A1, IDS.LINKED_CARD_A, [], 'Task A1'),
+        labelIds: [IDS.TODAY_LABEL],
+        linkedNodeIds: [IDS.LINKED_TASK_A1_T],
+      },
+      [IDS.LINKED_TASK_A2]: {
+        ...node(IDS.LINKED_TASK_A2, IDS.LINKED_CARD_A, [], 'Task A2'),
+        labelIds: [IDS.TODAY_LABEL],
+        linkedNodeIds: [IDS.LINKED_TASK_A2_T],
+      },
+      [IDS.LINKED_TODAY_CARD]: {
+        ...node(IDS.LINKED_TODAY_CARD, null, [IDS.LINKED_GROUP], "Today's Tasks"),
+        isTodaysTask: true,
+      },
+      [IDS.LINKED_GROUP]: {
+        ...node(IDS.LINKED_GROUP, IDS.LINKED_TODAY_CARD, [IDS.LINKED_TASK_A1_T, IDS.LINKED_TASK_A2_T], 'Card A'),
+        isTodaysTask: true,
+        isAutoGroupNode: true,
+        linkedNodeIds: [IDS.LINKED_CARD_A],
+      },
+      [IDS.LINKED_TASK_A1_T]: {
+        ...node(IDS.LINKED_TASK_A1_T, IDS.LINKED_GROUP, [], 'Task A1'),
+        isTodaysTask: true,
+        linkedNodeIds: [IDS.LINKED_TASK_A1],
+      },
+      [IDS.LINKED_TASK_A2_T]: {
+        ...node(IDS.LINKED_TASK_A2_T, IDS.LINKED_GROUP, [], 'Task A2'),
+        isTodaysTask: true,
+        linkedNodeIds: [IDS.LINKED_TASK_A2],
+      },
+    },
+    labels: {
+      [IDS.TODAY_LABEL]: { id: IDS.TODAY_LABEL, name: 'Today', color: '#FCD34D', isSystem: true },
+    },
+    rootOrder: [IDS.LINKED_TODAY_CARD, IDS.LINKED_CARD_A],
+    activeFilters: {},
+    todaysTasksRootId: IDS.LINKED_TODAY_CARD,
+    todaysTasksLabelId: IDS.TODAY_LABEL,
+    theme: 'light',
+    dragMode: false,
+    nestTargetId: null,
+    nestZoneActive: false,
+    history: [],
+    lastCleanupDate: null,
+  }
+}
+
+export async function setupLinkedDragState(page) {
+  await page.route('https://apis.google.com/**', route => route.abort())
+  await page.route('https://accounts.google.com/**', route => route.abort())
+  await injectState(page, buildLinkedDragState())
 }
