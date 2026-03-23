@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import KeyboardShortcutsHelp from '../UI/KeyboardShortcutsHelp.jsx'
 import { useStore } from '../../store/useStore.js'
 import { signOut } from '../../services/googleAuth.js'
@@ -141,7 +142,7 @@ export default function Header() {
             )}
           </div>
 
-          {showHelp && <KeyboardShortcutsHelp onClose={() => setShowHelp(false)} />}
+          {showHelp && createPortal(<KeyboardShortcutsHelp onClose={() => setShowHelp(false)} />, document.body)}
 
           {user && (
             <div className="relative group ml-1">
