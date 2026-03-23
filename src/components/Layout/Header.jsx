@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import KeyboardShortcutsHelp from '../UI/KeyboardShortcutsHelp.jsx'
+import ManualCleanupConfirm from '../UI/ManualCleanupConfirm.jsx'
 import { useStore } from '../../store/useStore.js'
 import { signOut } from '../../services/googleAuth.js'
 import { version } from '../../../package.json'
@@ -11,6 +12,7 @@ export default function Header() {
   const redoStack = useStore(s => s._redoStack)
   const [showHelp, setShowHelp] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [showManualCleanup, setShowManualCleanup] = useState(false)
   const [avatarError, setAvatarError] = useState(false)
   const settingsRef = useRef(null)
 
@@ -138,11 +140,29 @@ export default function Header() {
                 >
                   {theme === 'dark' ? '☀ Light mode' : '🌙 Dark mode'}
                 </button>
+
+                <button
+                  data-testid="manual-cleanup-btn"
+                  onClick={() => {
+                    setShowSettings(false)
+                    const { tomorrowsTasksRootId, nodes, runDailyCleanup } = useStore.getState()
+                    const hasTomorrow = tomorrowsTasksRootId && nodes[tomorrowsTasksRootId]?.childrenIds.length > 0
+                    if (hasTomorrow) {
+                      setShowManualCleanup(true)
+                    } else {
+                      runDailyCleanup({ manual: true, includeTomorrow: false })
+                    }
+                  }}
+                  className="w-full text-left px-3 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
+                >
+                  🧹 Cleanup Now
+                </button>
               </div>
             )}
           </div>
 
           {showHelp && createPortal(<KeyboardShortcutsHelp onClose={() => setShowHelp(false)} />, document.body)}
+          {showManualCleanup && createPortal(<ManualCleanupConfirm onClose={() => setShowManualCleanup(false)} />, document.body)}
 
           {user && (
             <div className="relative group ml-1">

@@ -1787,9 +1787,10 @@ export const useStore = create((set, get) => ({
     }
   },
 
-  runDailyCleanup() {
+  runDailyCleanup({ manual = false, includeTomorrow = true } = {}) {
     set(state => {
       const { nodes, todaysTasksRootId, lastCleanupDate, history } = state
+      const newDate = manual ? state.lastCleanupDate : new Date().toISOString().split('T')[0]
 
       // If no Today's Tasks card and no Tomorrow's Tasks card with tasks, nothing to do
       if (!todaysTasksRootId && !state.tomorrowsTasksRootId) return {}
@@ -1800,7 +1801,7 @@ export const useStore = create((set, get) => ({
       const newDeletedNodes = { ...state.deletedNodes }
 
       // ── Rollover Tomorrow's Tasks → Today's Tasks (silent) ──────────────────
-      if (state.tomorrowsTasksRootId) {
+      if (state.tomorrowsTasksRootId && (!manual || includeTomorrow)) {
         const tomorrowCard = newNodes[state.tomorrowsTasksRootId]
         if (tomorrowCard && tomorrowCard.childrenIds.length > 0) {
           // Ensure Today's Tasks card exists
@@ -1924,7 +1925,7 @@ export const useStore = create((set, get) => ({
         return {
           nodes: newNodes,
           rootOrder: newRootOrder,
-          lastCleanupDate: new Date().toISOString().split('T')[0],
+          lastCleanupDate: newDate,
           tomorrowsTasksRootId: state.tomorrowsTasksRootId,
           deletedNodes: newDeletedNodes,
         }
@@ -1935,7 +1936,7 @@ export const useStore = create((set, get) => ({
         return {
           nodes: newNodes,
           rootOrder: newRootOrder,
-          lastCleanupDate: new Date().toISOString().split('T')[0],
+          lastCleanupDate: newDate,
           todaysTasksRootId: activeTodaysId,
           deletedNodes: newDeletedNodes,
         }
@@ -2022,7 +2023,7 @@ export const useStore = create((set, get) => ({
       if (allPending.length > 0) {
         pendingCleanupTasks = allPending
       } else {
-        newLastCleanupDate = new Date().toISOString().split('T')[0]
+        newLastCleanupDate = newDate
       }
 
       return {
