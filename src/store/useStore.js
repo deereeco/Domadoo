@@ -854,6 +854,49 @@ export const useStore = create((set, get) => ({
         }
       }
 
+      // Descendant cleanup: when a node is linked, its descendants must not carry
+      // individual today labels or have standalone Today-root entries — they are
+      // now represented inside this node's linked tree.
+      const allDescendants = new Set()
+      function collectAllDescendants(id) {
+        newNodes[id]?.childrenIds.forEach(childId => {
+          allDescendants.add(childId)
+          collectAllDescendants(childId)
+        })
+      }
+      collectAllDescendants(nodeId)
+
+      if (allDescendants.size > 0) {
+        // Remove standalone Today-root copies whose originals are descendants of nodeId
+        const subsumedIds = newNodes[todaysId].childrenIds.filter(childId => {
+          if (childId === nodeId + '_today') return false
+          const origId = newNodes[childId]?.linkedNodeIds?.[0]
+          return origId && allDescendants.has(origId)
+        })
+        if (subsumedIds.length > 0) {
+          const subsumedSet = new Set(subsumedIds)
+          newNodes[todaysId] = {
+            ...newNodes[todaysId],
+            childrenIds: newNodes[todaysId].childrenIds.filter(id => !subsumedSet.has(id)),
+          }
+        }
+
+        // Strip today label from all descendants
+        if (todayLabelId) {
+          allDescendants.forEach(descId => {
+            const desc = newNodes[descId]
+            if (!desc) return
+            if (desc.labelIds.includes(todayLabelId)) {
+              newNodes[descId] = {
+                ...desc,
+                labelIds: desc.labelIds.filter(l => l !== todayLabelId),
+                updatedAt: Date.now(),
+              }
+            }
+          })
+        }
+      }
+
       return { nodes: newNodes }
     })
   },

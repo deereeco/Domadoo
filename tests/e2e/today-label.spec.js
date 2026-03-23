@@ -1,14 +1,33 @@
 import { test, expect } from '@playwright/test'
 import { setupMockState, IDS } from './helpers/mockState.js'
 
-// Helper: open the label assigner for a node and click the Today label option
+// Helper: open node Actions menu → Label → click Today label
 async function assignTodayLabel(page, nodeId) {
-  await page.locator(`[data-testid="node-${nodeId}"]`).hover()
-  await page.locator(`[data-testid="node-${nodeId}"] button[title="Add label (Ctrl+L)"]`).click({ force: true })
-  // Scope button click to the node element to avoid matching header buttons
-  await page.locator(`[data-testid="node-${nodeId}"]`).getByRole('button', { name: 'Today', exact: true }).click()
-  // Close the assigner by pressing Escape
+  const node = page.locator(`[data-testid="node-${nodeId}"]`)
+  await node.hover()
+  await node.locator('button[title="Actions"]').click({ force: true })
+  await page.waitForTimeout(100)
+  await page.getByRole('button', { name: 'Label', exact: true }).click()
+  await page.waitForTimeout(100)
+  await page.getByRole('button', { name: 'Today', exact: true }).click({ force: true })
   await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
+}
+
+// Helper: open node Actions menu → Delete
+async function deleteNode(page, nodeId) {
+  const node = page.locator(`[data-testid="node-${nodeId}"]`)
+  await node.hover()
+  await node.locator('button[title="Actions"]').click({ force: true })
+  await page.getByRole('button', { name: 'Delete', exact: true }).click()
+  await page.waitForTimeout(100)
+}
+
+// Helper: open card overflow menu and click the Today toggle button
+async function toggleCardToday(page, cardId) {
+  const header = page.locator(`[data-testid="card-header-${cardId}"]`)
+  await header.locator('button[title="Actions"]').click()
+  await page.locator(`[data-testid="today-toggle-card-${cardId}"]`).click()
   await page.waitForTimeout(200)
 }
 
@@ -22,12 +41,14 @@ test.describe('Today label', () => {
   // ── Today label always present ────────────────────────────────────────────
 
   test('Today label is visible in label assigner by default', async ({ page }) => {
-    await page.locator(`[data-testid="node-${IDS.TASK_A1}"]`).hover()
-    await page.locator(`[data-testid="node-${IDS.TASK_A1}"] button[title="Add label (Ctrl+L)"]`).click({ force: true })
-    // Today label button should be visible inside the dropdown (scoped to node)
-    await expect(
-      page.locator(`[data-testid="node-${IDS.TASK_A1}"]`).getByRole('button', { name: 'Today', exact: true })
-    ).toBeVisible()
+    const node = page.locator(`[data-testid="node-${IDS.TASK_A1}"]`)
+    await node.hover()
+    await node.locator('button[title="Actions"]').click({ force: true })
+    await page.waitForTimeout(100)
+    await page.getByRole('button', { name: 'Label', exact: true }).click()
+    await page.waitForTimeout(100)
+    // Today label button should be present in the label assigner
+    await expect(page.locator('[data-testid="label-assigner"]').getByRole('button', { name: 'Today', exact: true })).toBeVisible({ timeout: 3000 })
   })
 
   // ── Assigning Today label creates Today's Tasks card + linked copy ────────
@@ -64,15 +85,19 @@ test.describe('Today label', () => {
   })
 
   test("removing Today label via label assigner removes linked copy from Today's Tasks", async ({ page }) => {
-    // Open assigner and assign Today label — keep assigner open (no Escape)
-    await page.locator(`[data-testid="node-${IDS.TASK_A1}"]`).hover()
-    await page.locator(`[data-testid="node-${IDS.TASK_A1}"] button[title="Add label (Ctrl+L)"]`).click({ force: true })
-    const todayBtn = page.locator(`[data-testid="node-${IDS.TASK_A1}"]`).getByRole('button', { name: 'Today', exact: true })
-    await todayBtn.click()
+    // Open assigner via Actions menu and assign Today label — keep assigner open
+    const node = page.locator(`[data-testid="node-${IDS.TASK_A1}"]`)
+    await node.hover()
+    await node.locator('button[title="Actions"]').click({ force: true })
+    await page.waitForTimeout(100)
+    await page.getByRole('button', { name: 'Label', exact: true }).click()
+    await page.waitForTimeout(100)
+    const todayBtn = page.getByRole('button', { name: 'Today', exact: true })
+    await todayBtn.click({ force: true })
     await page.waitForTimeout(200)
 
     // Assigner is still open — click Today again to unassign
-    await todayBtn.click()
+    await todayBtn.click({ force: true })
     await page.waitForTimeout(200)
 
     // Linked copy should never have persisted (or was removed)
@@ -83,9 +108,7 @@ test.describe('Today label', () => {
   // ── Root card Today label ─────────────────────────────────────────────────
 
   test("assigning Today label to a root card links it to Today's Tasks", async ({ page }) => {
-    // Click the sun (Today) toggle button on Card A's header
-    await page.locator(`[data-testid="today-toggle-card-${IDS.CARD_A}"]`).click()
-    await page.waitForTimeout(200)
+    await toggleCardToday(page, IDS.CARD_A)
 
     // Today's Tasks card should appear
     const todayCard = page.locator('[data-testid="today-tasks-card"]')
@@ -93,6 +116,49 @@ test.describe('Today label', () => {
 
     // A linked copy of Card A's content ("Card A") should appear inside Today's Tasks
     await expect(todayCard.locator('[data-testid^="node-"]').filter({ hasText: 'Card A' }).first()).toBeVisible()
+  })
+
+  test('root card shows amber Today pill when linked to Today\'s Tasks', async ({ page }) => {
+    await toggleCardToday(page, IDS.CARD_A)
+
+    // The Today label pill should be visible on Card A's header
+    const cardA = page.locator(`[data-testid="card-${IDS.CARD_A}"]`)
+    await expect(cardA.locator(`[data-testid="label-pill-${IDS.TODAY_LABEL}"]`)).toBeVisible()
+  })
+
+  test('adding root card to Today\'s Tasks absorbs existing subtask today label', async ({ page }) => {
+    // First add subtask A1 individually to Today's Tasks
+    await assignTodayLabel(page, IDS.TASK_A1)
+
+    // Verify A1 has the today label pill
+    const taskA1 = page.locator(`[data-testid="node-${IDS.TASK_A1}"]`)
+    await expect(taskA1.locator(`[data-testid="label-pill-${IDS.TODAY_LABEL}"]`)).toBeVisible()
+
+    // Now add the root card A to Today's Tasks — should absorb A1's individual label
+    await toggleCardToday(page, IDS.CARD_A)
+
+    // A1's today label pill should be gone (subsumed by the root card)
+    await expect(taskA1.locator(`[data-testid="label-pill-${IDS.TODAY_LABEL}"]`)).toHaveCount(0)
+
+    // Today's Tasks should still show Task A1 (inside Card A's copy)
+    const todayCard = page.locator('[data-testid="today-tasks-card"]')
+    await expect(todayCard.locator('[data-testid^="node-"]').filter({ hasText: 'Task A1' }).first()).toBeVisible()
+  })
+
+  test('removing Today pill from root card unlinks all nested copies', async ({ page }) => {
+    await toggleCardToday(page, IDS.CARD_A)
+
+    const todayCard = page.locator('[data-testid="today-tasks-card"]')
+    await expect(todayCard.locator('[data-testid^="node-"]').filter({ hasText: 'Task A1' }).first()).toBeVisible()
+
+    // Click the × on the Today pill in Card A's header
+    const cardA = page.locator(`[data-testid="card-${IDS.CARD_A}"]`)
+    await cardA.locator(`[data-testid="label-pill-remove-${IDS.TODAY_LABEL}"]`).click({ force: true })
+    await page.waitForTimeout(200)
+
+    // All nested copies should be removed from Today's Tasks
+    await expect(todayCard.locator('[data-testid^="node-"]').filter({ hasText: 'Task A1' })).toHaveCount(0)
+    await expect(todayCard.locator('[data-testid^="node-"]').filter({ hasText: 'Task A2' })).toHaveCount(0)
   })
 })
 
@@ -104,8 +170,7 @@ test.describe("Root card nesting in Today's Tasks", () => {
     await page.goto('/Domadoo/')
     await page.waitForSelector('[data-testid="board"]')
     // Link Card A to Today's Tasks before each test
-    await page.locator(`[data-testid="today-toggle-card-${IDS.CARD_A}"]`).click()
-    await page.waitForTimeout(200)
+    await toggleCardToday(page, IDS.CARD_A)
   })
 
   test("nested children appear in Today's Tasks when root card is linked", async ({ page }) => {
@@ -147,11 +212,8 @@ test.describe("Root card nesting in Today's Tasks", () => {
     const todayCard = page.locator('[data-testid="today-tasks-card"]')
     await expect(todayCard.locator('[data-testid^="node-"]').filter({ hasText: 'Task A1' }).first()).toBeVisible()
 
-    // Hover Task A1 in the original card and click delete
-    const taskA1 = page.locator(`[data-testid="card-${IDS.CARD_A}"]`).locator(`[data-testid="node-${IDS.TASK_A1}"]`)
-    await taskA1.hover()
-    await taskA1.locator('button[title="Delete"]').click({ force: true })
-    await page.waitForTimeout(100)
+    // Open Actions menu on Task A1 in the original card and delete
+    await deleteNode(page, IDS.TASK_A1)
     // Confirm "Delete both" in the linked-node dialog (exact match to avoid strict mode violation)
     await page.getByRole('button', { name: 'Delete both', exact: true }).click()
     await page.waitForTimeout(200)
@@ -163,9 +225,8 @@ test.describe("Root card nesting in Today's Tasks", () => {
     const todayCard = page.locator('[data-testid="today-tasks-card"]')
     await expect(todayCard.locator('[data-testid^="node-"]').filter({ hasText: 'Task A1' }).first()).toBeVisible()
 
-    // Click the sun toggle again to unlink Card A
-    await page.locator(`[data-testid="today-toggle-card-${IDS.CARD_A}"]`).click()
-    await page.waitForTimeout(200)
+    // Click the sun toggle again to unlink Card A (via overflow menu)
+    await toggleCardToday(page, IDS.CARD_A)
 
     await expect(todayCard.locator('[data-testid^="node-"]').filter({ hasText: 'Task A1' })).toHaveCount(0)
     await expect(todayCard.locator('[data-testid^="node-"]').filter({ hasText: 'Task A2' })).toHaveCount(0)

@@ -7,6 +7,7 @@ import { useStore } from '../../store/useStore.js'
 import NodeItem from '../Node/NodeItem.jsx'
 import NodeContent from '../Node/NodeContent.jsx'
 import LabelAssigner from '../Labels/LabelAssigner.jsx'
+import LabelPill from '../Labels/LabelPill.jsx'
 import DatePickerPopover from '../Node/DatePickerPopover.jsx'
 
 export default function RootCard({ nodeId, peekLocked = false }) {
@@ -207,6 +208,13 @@ export default function RootCard({ nodeId, peekLocked = false }) {
                 </svg>
               )}
             </button>
+          )}
+          {isLinkedToToday && todaysTasksLabelId && (
+            <LabelPill
+              small
+              label={{ id: todaysTasksLabelId, name: 'Today', color: '#F59E0B' }}
+              onRemove={() => toggleLabelOnNode(nodeId, todaysTasksLabelId)}
+            />
           )}
           <NodeContent
               content={node.content}
