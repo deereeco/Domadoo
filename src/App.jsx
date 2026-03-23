@@ -89,7 +89,9 @@ export default function App() {
 
   // Run on mount, tab focus, and BFCache restore (pageshow covers mobile back-navigation)
   useEffect(() => {
-    runCleanupCheck()
+    // Skip on mount if user is already logged in — Drive sync (in onSignIn) will run it
+    // after hydrating up-to-date data, preventing a stale-cache cleanup prompt (issue #57)
+    if (!useStore.getState().user) runCleanupCheck()
     const handleVisibility = () => {
       runCleanupCheck()
       if (document.visibilityState === 'visible') refreshFromDrive()

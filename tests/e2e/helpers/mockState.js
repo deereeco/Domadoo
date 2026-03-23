@@ -161,14 +161,25 @@ export function buildCleanupState({ lastCleanupDate = isoDate(-1) } = {}) {
   }
 }
 
-function injectState(page, state) {
+async function injectState(page, state) {
+  // Abort Drive API calls (no Drive data in tests) — wildcard added first so specific routes below take precedence
+  await page.route('https://www.googleapis.com/**', route => route.abort())
+  // Fulfill getUserInfo so onSignIn can complete without real OAuth tokens
+  await page.route('https://www.googleapis.com/oauth2/v3/userinfo', route =>
+    route.fulfill({ contentType: 'application/json', body: JSON.stringify({ name: MOCK_USER.name, email: MOCK_USER.email, picture: MOCK_USER.picture }) })
+  )
+
   return page.addInitScript(({ user, state }) => {
     localStorage.setItem('domadoo_user', JSON.stringify(user))
     localStorage.setItem('domadoo_state', JSON.stringify(state))
     window.google = {
       accounts: {
         oauth2: {
-          initTokenClient: () => ({ requestAccessToken: () => {} }),
+          // Trigger the auth callback asynchronously so onSignIn fires and
+          // calls runCleanupCheck() after hydration (mirrors real-world timing)
+          initTokenClient: ({ callback }) => ({
+            requestAccessToken: () => setTimeout(() => callback({ access_token: 'playwright-test-token' }), 0),
+          }),
           revoke: () => {},
         },
         id: {
