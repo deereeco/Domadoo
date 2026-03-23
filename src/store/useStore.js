@@ -335,7 +335,50 @@ export const useStore = create((set, get) => ({
         })
       }
 
+      // After toggling a node, auto-complete or reopen parent if all its checkbox children are done/undone.
+      // Cascades up the tree. Skips Today's/Tomorrow's roots and auto-group nodes.
+      const cascadeParent = (nodeId) => {
+        const node = updates[nodeId] ?? state.nodes[nodeId]
+        if (!node || !node.parentId) return
+        const parentId = node.parentId
+        const parent = updates[parentId] ?? state.nodes[parentId]
+        if (!parent) return
+        // Don't auto-complete/reopen container nodes
+        if (parent.isAutoGroupNode) return
+        if (parentId === state.todaysTasksRootId || parentId === state.tomorrowsTasksRootId) return
+
+        const checkboxChildren = parent.childrenIds
+          .map(cid => updates[cid] ?? state.nodes[cid])
+          .filter(c => c && c.type === 'CHECKBOX')
+        if (checkboxChildren.length === 0) return  // parent status stays independent
+
+        const allComplete = checkboxChildren.every(c => c.status === 'COMPLETED')
+        const parentStatus = (updates[parentId] ?? state.nodes[parentId]).status
+
+        if (allComplete && parentStatus !== 'COMPLETED') {
+          const p = updates[parentId] ?? state.nodes[parentId]
+          const now = new Date().toISOString()
+          updates[parentId] = { ...p, status: 'COMPLETED', completedAt: now, updatedAt: ts }
+          p.linkedNodeIds.forEach(lid => {
+            const linked = updates[lid] ?? state.nodes[lid]
+            if (linked) updates[lid] = { ...linked, status: 'COMPLETED', completedAt: now, updatedAt: ts }
+          })
+          cascadeParent(parentId)
+        } else if (!allComplete && parentStatus === 'COMPLETED') {
+          const p = updates[parentId] ?? state.nodes[parentId]
+          updates[parentId] = { ...p, status: 'OPEN', completedAt: null, updatedAt: ts }
+          p.linkedNodeIds.forEach(lid => {
+            const linked = updates[lid] ?? state.nodes[lid]
+            if (linked) updates[lid] = { ...linked, status: 'OPEN', completedAt: null, updatedAt: ts }
+          })
+          cascadeParent(parentId)
+        }
+      }
+
       applyComplete(id)
+      // Cascade from the toggled node and all its linked copies
+      const allToggled = [id, ...(state.nodes[id]?.linkedNodeIds ?? [])]
+      allToggled.forEach(nid => cascadeParent(nid))
       return { nodes: { ...state.nodes, ...updates } }
     })
   },
@@ -1692,6 +1735,18 @@ export const useStore = create((set, get) => ({
         return n.childrenIds.every(cid => allCheckboxDescendantsComplete(cid))
       }
 
+      // Returns true if any checkbox node in the subtree (excluding root) is COMPLETED
+      const anyCheckboxDescendantComplete = (nodeId) => {
+        const n = newNodes[nodeId]
+        if (!n) return false
+        return n.childrenIds.some(cid => {
+          const child = newNodes[cid]
+          if (!child) return false
+          if (child.type === 'CHECKBOX' && child.status === 'COMPLETED') return true
+          return anyCheckboxDescendantComplete(cid)
+        })
+      }
+
       const completed = todaysCard.childrenIds.filter(id => {
         const n = newNodes[id]
         if (!n) return false
@@ -1699,15 +1754,25 @@ export const useStore = create((set, get) => ({
         if (n.isAutoGroupNode) return allCheckboxDescendantsComplete(id, true)
         return n.status === 'COMPLETED' && allCheckboxDescendantsComplete(id)
       })
+      // Partially-completed: parent incomplete but has ≥1 completed checkbox descendant
+      const partiallyCompleted = todaysCard.childrenIds.filter(id => {
+        const n = newNodes[id]
+        if (!n || n.isAutoGroupNode) return false
+        if (n.status === 'COMPLETED') return false
+        return anyCheckboxDescendantComplete(id)
+      })
       const incomplete = todaysCard.childrenIds.filter(id => {
         const n = newNodes[id]
         // Auto-group nodes auto-stay (handled transitively); don't show in cleanup modal
         if (!n || n.isAutoGroupNode) return false
-        return n.status !== 'COMPLETED'
+        if (n.status === 'COMPLETED') return false
+        // Partially-completed tasks are shown in their own section
+        if (anyCheckboxDescendantComplete(id)) return false
+        return true
         // root-complete-but-subtasks-open: intentionally in neither bucket → auto-stay
       })
 
-      // Set up pending tasks (modal handles both completed and incomplete)
+      // Set up pending tasks (modal handles completed, partially-completed, and incomplete)
       let pendingCleanupTasks = null
       let newLastCleanupDate = state.lastCleanupDate
 
@@ -1715,19 +1780,30 @@ export const useStore = create((set, get) => ({
         id,
         content: newNodes[id]?.content ?? '',
         originalId: newNodes[id]?.linkedNodeIds[0] ?? null,
-        resolved: null, // 'repeat' | 'remove' | 'pushback'
+        resolved: null, // 'archive_repeat' | 'archive_remove' | 'pushback'
         isCompleted: true,
+        isPartiallyCompleted: false,
+      }))
+
+      const partiallyCompletedPending = partiallyCompleted.map(id => ({
+        id,
+        content: newNodes[id]?.content ?? '',
+        originalId: newNodes[id]?.linkedNodeIds[0] ?? null,
+        resolved: null, // 'today' | 'partial_archive_keep' | 'partial_archive_source' | 'partial_force_remove'
+        isCompleted: false,
+        isPartiallyCompleted: true,
       }))
 
       const incompletePending = incomplete.map(id => ({
         id,
         content: newNodes[id]?.content ?? '',
         originalId: newNodes[id]?.linkedNodeIds[0] ?? null,
-        resolved: null, // 'today' | 'complete' | 'pushback'
+        resolved: null, // 'today' | 'complete_repeat' | 'complete_remove' | 'pushback'
         isCompleted: false,
+        isPartiallyCompleted: false,
       }))
 
-      const allPending = [...completedPending, ...incompletePending]
+      const allPending = [...completedPending, ...partiallyCompletedPending, ...incompletePending]
       if (allPending.length > 0) {
         pendingCleanupTasks = allPending
       } else {
@@ -1770,7 +1846,25 @@ export const useStore = create((set, get) => ({
       const cleanupDeletedAt = Date.now()
       const yesterdayDate = lastCleanupDate
 
+      // Build a recursive snapshot from the original node's subtree
+      const buildSnapshotNode = (origId) => {
+        const orig = newNodes[origId] ?? nodes[origId]
+        if (!orig) return null
+        const completedAt = orig.completedAt ?? nodes[origId]?.completedAt ?? null
+        const children = (orig.childrenIds ?? []).map(buildSnapshotNode).filter(Boolean)
+        return {
+          id: origId,
+          content: orig.content,
+          status: orig.status === 'COMPLETED' ? 'COMPLETED' : 'INCOMPLETE',
+          type: orig.type,
+          completedAt,
+          children,
+        }
+      }
+
       const toArchive = []
+      // Direct history entries for partial cleanup actions (not full-task archives)
+      const partialHistoryTasks = []
 
       pendingCleanupTasks.forEach(task => {
         const { id: todayId, resolved, isCompleted } = task
@@ -1910,11 +2004,210 @@ export const useStore = create((set, get) => ({
             delete newNodes[tid]
             newDeletedNodes[tid] = { deletedAt: cleanupDeletedAt }
           })
+        } else if (resolved === 'partial_archive_keep' || resolved === 'partial_archive_source') {
+          // Archive completed direct children; keep (or push back) parent with incomplete children.
+          const originalId = todayNode.linkedNodeIds[0]
+          const origNode = originalId ? newNodes[originalId] : null
+
+          // Collect completed direct children of the today copy
+          const completedTodayChildren = todayNode.childrenIds.filter(cid => {
+            const c = newNodes[cid]
+            return c && c.type === 'CHECKBOX' && c.status === 'COMPLETED'
+          })
+
+          // Build snapshot children from the originals of completed today children
+          const archivedChildren = completedTodayChildren.map(cid => {
+            const c = newNodes[cid]
+            return c ? buildSnapshotNode(c.linkedNodeIds[0] ?? cid) : null
+          }).filter(Boolean)
+
+          if (archivedChildren.length > 0) {
+            // History entry: parent (INCOMPLETE) + completed children
+            const parentOrigId = origNode ? originalId : todayId
+            partialHistoryTasks.push({
+              id: parentOrigId,
+              content: (origNode ?? todayNode).content,
+              status: 'INCOMPLETE',
+              type: (origNode ?? todayNode).type,
+              completedAt: null,
+              children: archivedChildren,
+            })
+
+            // Delete completed today children and their today descendants; unlink + delete originals
+            completedTodayChildren.forEach(cid => {
+              const c = newNodes[cid]
+              if (!c) return
+              const childOrigId = c.linkedNodeIds[0]
+
+              // Remove from today parent's childrenIds
+              newNodes[todayId] = {
+                ...newNodes[todayId],
+                childrenIds: newNodes[todayId].childrenIds.filter(id => id !== cid),
+              }
+
+              // Collect + delete all today descendants of this child
+              const collectToday = (nid) => {
+                const n = newNodes[nid]
+                if (!n) return
+                // Unlink from originals
+                n.linkedNodeIds.forEach(oid => {
+                  const orig = newNodes[oid]
+                  if (orig) {
+                    newNodes[oid] = {
+                      ...orig,
+                      linkedNodeIds: orig.linkedNodeIds.filter(lid => lid !== nid),
+                    }
+                  }
+                })
+                delete newNodes[nid]
+                newDeletedNodes[nid] = { deletedAt: cleanupDeletedAt }
+                n.childrenIds.forEach(collectToday)
+              }
+              collectToday(cid)
+
+              // Remove original child from its parent (source card) and delete it + descendants
+              if (childOrigId && newNodes[childOrigId]) {
+                if (origNode) {
+                  newNodes[originalId] = {
+                    ...newNodes[originalId],
+                    childrenIds: newNodes[originalId].childrenIds.filter(id => id !== childOrigId),
+                  }
+                }
+                const collectOrig = (nid) => {
+                  const n = newNodes[nid]
+                  if (!n) return
+                  let { labelIds } = n
+                  if (state.todaysTasksLabelId && labelIds.includes(state.todaysTasksLabelId)) {
+                    labelIds = labelIds.filter(lid => lid !== state.todaysTasksLabelId)
+                  }
+                  // Unlink from any today copies that weren't already deleted
+                  n.linkedNodeIds.forEach(lid => {
+                    if (newNodes[lid]) {
+                      newNodes[lid] = {
+                        ...newNodes[lid],
+                        linkedNodeIds: newNodes[lid].linkedNodeIds.filter(id => id !== nid),
+                      }
+                    }
+                  })
+                  delete newNodes[nid]
+                  newDeletedNodes[nid] = { deletedAt: cleanupDeletedAt }
+                  n.childrenIds.forEach(collectOrig)
+                }
+                collectOrig(childOrigId)
+              }
+            })
+          }
+
+          if (resolved === 'partial_archive_source') {
+            // Push remaining today copies back to source and remove from Today's Tasks
+            const toDelete = new Set()
+            const collectRemaining = (nid) => {
+              const n = newNodes[nid]
+              if (!n) return
+              toDelete.add(nid)
+              n.childrenIds.forEach(collectRemaining)
+            }
+            collectRemaining(todayId)
+
+            newNodes[todaysTasksRootId] = {
+              ...newNodes[todaysTasksRootId],
+              childrenIds: newNodes[todaysTasksRootId].childrenIds.filter(c => c !== todayId),
+            }
+
+            toDelete.forEach(tid => {
+              const todayCopy = newNodes[tid]
+              if (!todayCopy) return
+              todayCopy.linkedNodeIds.forEach(oid => {
+                const orig = newNodes[oid]
+                if (!orig) return
+                const filteredLinks = orig.linkedNodeIds.filter(lid => !toDelete.has(lid))
+                let { labelIds } = orig
+                if (state.todaysTasksLabelId && labelIds.includes(state.todaysTasksLabelId)) {
+                  labelIds = labelIds.filter(lid => lid !== state.todaysTasksLabelId)
+                }
+                newNodes[oid] = { ...orig, linkedNodeIds: filteredLinks, labelIds }
+              })
+              delete newNodes[tid]
+              newDeletedNodes[tid] = { deletedAt: cleanupDeletedAt }
+            })
+          }
+        } else if (resolved === 'partial_force_remove') {
+          // Mark all today descendants COMPLETED, archive full tree, then remove everything
+          const now = new Date().toISOString()
+          const markAllComplete = (nid) => {
+            const n = newNodes[nid]
+            if (!n) return
+            if (n.type === 'CHECKBOX' && n.status !== 'COMPLETED') {
+              newNodes[nid] = { ...n, status: 'COMPLETED', completedAt: now }
+              n.linkedNodeIds.forEach(oid => {
+                const orig = newNodes[oid]
+                if (orig) newNodes[oid] = { ...orig, status: 'COMPLETED', completedAt: now }
+              })
+            }
+            n.childrenIds.forEach(markAllComplete)
+          }
+          markAllComplete(todayId)
+          toArchive.push(todayId)
+
+          // Unlink from Today's card
+          newNodes[todaysTasksRootId] = {
+            ...newNodes[todaysTasksRootId],
+            childrenIds: newNodes[todaysTasksRootId].childrenIds.filter(c => c !== todayId),
+          }
+
+          // Delete _today descendants
+          const toDelete = new Set()
+          const collect = (nid) => {
+            const n = newNodes[nid]
+            if (!n) return
+            toDelete.add(nid)
+            n.childrenIds.forEach(collect)
+          }
+          collect(todayId)
+
+          toDelete.forEach(tid => {
+            const todayCopy = newNodes[tid]
+            if (!todayCopy) return
+            todayCopy.linkedNodeIds.forEach(oid => {
+              const orig = newNodes[oid]
+              if (!orig) return
+              const filteredLinks = orig.linkedNodeIds.filter(lid => !toDelete.has(lid))
+              let { labelIds } = orig
+              if (state.todaysTasksLabelId && labelIds.includes(state.todaysTasksLabelId)) {
+                labelIds = labelIds.filter(lid => lid !== state.todaysTasksLabelId)
+              }
+              newNodes[oid] = { ...orig, linkedNodeIds: filteredLinks, labelIds }
+            })
+            delete newNodes[tid]
+            newDeletedNodes[tid] = { deletedAt: cleanupDeletedAt }
+          })
+
+          // Remove the original from its source card
+          const originalId = todayNode.linkedNodeIds[0]
+          if (originalId && newNodes[originalId]) {
+            const sourceCardId = newNodes[originalId].parentId
+            if (sourceCardId && newNodes[sourceCardId]) {
+              newNodes[sourceCardId] = {
+                ...newNodes[sourceCardId],
+                childrenIds: newNodes[sourceCardId].childrenIds.filter(c => c !== originalId),
+              }
+            }
+            // Delete original + descendants
+            const collectOrig = (nid) => {
+              const n = newNodes[nid]
+              if (!n) return
+              delete newNodes[nid]
+              newDeletedNodes[nid] = { deletedAt: cleanupDeletedAt }
+              n.childrenIds.forEach(collectOrig)
+            }
+            collectOrig(originalId)
+          }
         }
         // 'today': leave as-is, stays in Today's Tasks (incomplete tasks only)
       })
 
       // Archive resolved tasks (complete_repeat, complete_remove, archive_repeat, archive_remove, pushback for completed)
+      const allHistoryTasks = [...partialHistoryTasks]
       if (toArchive.length > 0) {
         const snapshotTasks = toArchive.map(id => {
           const n = newNodes[id] ?? nodes[id]
@@ -1924,24 +2217,23 @@ export const useStore = create((set, get) => ({
           // For 'repeat' tasks, newNodes[origId].completedAt was reset to undefined;
           // fall back to the pre-cleanup value from nodes[] for the history record.
           const completedAt = orig.completedAt ?? nodes[origId]?.completedAt ?? n.completedAt
-          return {
-            id: origId,
-            content: orig.content,
-            status: 'COMPLETED',
-            type: orig.type,
-            completedAt,
-            children: [],
-          }
+          const snap = buildSnapshotNode(origId)
+          return snap
+            ? { ...snap, status: 'COMPLETED', completedAt: completedAt ?? snap.completedAt }
+            : null
         }).filter(Boolean)
+        allHistoryTasks.push(...snapshotTasks)
+      }
 
+      if (allHistoryTasks.length > 0) {
         const existingIdx = newHistory.findIndex(s => s.date === yesterdayDate)
         if (existingIdx >= 0) {
           newHistory[existingIdx] = {
             ...newHistory[existingIdx],
-            tasks: [...newHistory[existingIdx].tasks, ...snapshotTasks],
+            tasks: [...newHistory[existingIdx].tasks, ...allHistoryTasks],
           }
         } else {
-          newHistory.push(createHistorySnapshot(yesterdayDate, snapshotTasks))
+          newHistory.push(createHistorySnapshot(yesterdayDate, allHistoryTasks))
         }
       }
 

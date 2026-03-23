@@ -14,7 +14,7 @@ export default function RootCard({ nodeId, peekLocked = false }) {
           toggleLabelOnNode, todaysTasksLabelId, tomorrowsTasksLabelId,
           collapsedCards, toggleCardCollapse,
           pinnedCards, toggleCardPin,
-          openDetailsModal } = useStore()
+          openDetailsModal, toggleComplete, nodes } = useStore()
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: nodeId,
@@ -67,6 +67,10 @@ export default function RootCard({ nodeId, peekLocked = false }) {
   const isTomorrow = node.isTomorrowsTask
   const hasTodayLabel = node.labelIds?.includes(todaysTasksLabelId)
   const hasTomorrowLabel = node.labelIds?.includes(tomorrowsTasksLabelId)
+  // True when this card has a today copy in Today's Tasks (show a checkbox on the card header)
+  const todayLinkId = node.linkedNodeIds?.find(lid => nodes[lid]?.isTodaysTask)
+  const isLinkedToToday = !!todayLinkId && !isToday
+  const isCardComplete = node.status === 'COMPLETED'
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -169,6 +173,25 @@ export default function RootCard({ nodeId, peekLocked = false }) {
           )}
           {isTomorrow && (
             <span className="text-blue-500 text-xs font-semibold uppercase tracking-wide">Tomorrow</span>
+          )}
+          {isLinkedToToday && (
+            <button
+              data-testid={`card-checkbox-${nodeId}`}
+              tabIndex={-1}
+              onClick={() => toggleComplete(nodeId)}
+              title={isCardComplete ? 'Mark as incomplete' : 'Mark card as complete'}
+              className={`flex-shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
+                isCardComplete
+                  ? 'bg-emerald-500 border-emerald-500'
+                  : 'border-zinc-300 dark:border-zinc-600 hover:border-zinc-500 dark:hover:border-zinc-400'
+              }`}
+            >
+              {isCardComplete && (
+                <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+            </button>
           )}
           <NodeContent
               content={node.content}
