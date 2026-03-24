@@ -10,7 +10,7 @@ const SHORTCUTS = {
   '↓':          { label: 'Next task', ctx: 'Navigate' },
   '←':          { label: 'Collapse / parent', ctx: 'Navigate' },
   '→':          { label: 'Expand / enter', ctx: 'Navigate' },
-  'D':          { label: 'Open details', ctx: 'Ctrl+D' },
+  'D':          { label: 'Open details / Toggle drag mode', ctx: 'Ctrl+D / Ctrl+Shift+D' },
   'L':          { label: 'Assign label', ctx: 'Ctrl+L' },
   'N':          { label: 'New card', ctx: 'Ctrl+Shift+N' },
   'Z':          { label: 'Undo / Redo', ctx: 'Ctrl+Z / Ctrl+Shift+Z' },

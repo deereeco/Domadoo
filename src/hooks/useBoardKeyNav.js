@@ -5,6 +5,7 @@ export function useBoardKeyNav() {
   const addRootNode = useStore(s => s.addRootNode)
   const undo = useStore(s => s.undo)
   const redo = useStore(s => s.redo)
+  const toggleDragMode = useStore(s => s.toggleDragMode)
 
   useEffect(() => {
     const handler = (e) => {
@@ -16,6 +17,10 @@ export function useBoardKeyNav() {
 
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z') {
         if (!inContentEditable) { e.preventDefault(); redo() }
+      }
+
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'd') {
+        if (!inContentEditable) { e.preventDefault(); toggleDragMode() }
       }
 
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'n') {
@@ -37,5 +42,5 @@ export function useBoardKeyNav() {
     }
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
-  }, [addRootNode, undo, redo])
+  }, [addRootNode, undo, redo, toggleDragMode])
 }
